@@ -1,3 +1,4 @@
+# pylint: disable=no-member
 import pygame
 
 pygame.init()
@@ -9,8 +10,8 @@ CELL_WIDTH = 32
 CELL_HEIGHT = 32
 
 #MAP VARS
-MAP_WIDTH = 30
-MAP_HEIGHT = 30
+MAP_WIDTH = 20
+MAP_HEIGHT = 20
 
 #Color Defs
 COLOR_BLACK = (0, 0, 0)
@@ -24,3 +25,4 @@ BACKGROUND_COLOR = COLOR_GREY
 S_PLAYER = pygame.image.load("assets/snake.png")
 S_WALL = pygame.image.load("assets/wall.png")
 S_FLOOR = pygame.image.load("assets/floor.jpg")
+S_CRAB = pygame.image.load("assets/crab.png")
