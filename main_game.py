@@ -30,7 +30,6 @@ class obj_Actor:
         if is_visible:
             SURFACE_MAIN.blit(self.sprite, ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
     
-
 #COMPONENTS
 class com_Creature:
     '''Creatures have health, can dmg other objects. Can die.'''
@@ -55,20 +54,16 @@ class com_Creature:
             self.owner.y += dy
 
     def attack(self, target, damage):
-        print(self.name + " attacks " + target.creature.name + " for " + str(damage) + " damage!")
+        game_message((self.name + " attacks " + target.creature.name + " for " + str(damage) + " damage!"), constants.COLOR_RED)
         target.creature.take_damage(damage)
 
     def take_damage(self,damage):
         self.hp -= damage
-        print(self.name + "'s health is " + str(self.hp) + "/" + str(self.maxhp))
+        game_message(self.name + "'s health is " + str(self.hp) + "/" + str(self.maxhp), constants.COLOR_RED)
 
         if self.hp <= 0:
             if self.death_function is not None:
                 self.death_function(self.owner)
-
-#class com_Item:
-
-#class com_Container:
 
 #AI
 class ai_Test:
@@ -133,7 +128,7 @@ def map_check_for_creatures(x, y, exclude_object = None):
 def map_make_fov(incoming_map):
     global FOV_MAP
 
-    FOV_MAP = libtcodpy.map_new(constants.MAP_WIDTH, constants.MAP_HEIGHT)
+    FOV_MAP = libtcodpy.map.Map(constants.MAP_WIDTH, constants.MAP_HEIGHT)
 
     for y in range(constants.MAP_HEIGHT):
         for x in range(constants.MAP_WIDTH):
@@ -146,6 +141,7 @@ def map_calc_fov():
     if FOV_CALC:
         FOV_CALC = False
         libtcodpy.map_compute_fov(FOV_MAP, PLAYER.x, PLAYER.y, constants.TORCH_RADIUS, constants.FOV_LIGHT_WALLS, constants.FOV_ALGO)
+
 #DRAW FUNCTIONS
 def draw_game():
 
@@ -155,6 +151,8 @@ def draw_game():
     draw_map(GAME_MAP)
     for obj in GAME_OBJECTS:
         obj.draw()
+
+    draw_debug()
     pygame.display.flip()
 
 def draw_map(map_to_draw):
@@ -179,6 +177,46 @@ def draw_map(map_to_draw):
                 else:
                     SURFACE_MAIN.blit(constants.S_FLOOREXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
 
+def draw_text(display_surface, text_to_display, T_coords, text_color, back_color = None):
+    '''This function takes in text and displays it on the referenced surface'''
+
+    text_surf, text_rect = helper_text_objects(text_to_display, text_color, back_color)
+
+    text_rect.topleft = T_coords
+
+    display_surface.blit(text_surf, text_rect)
+
+def draw_debug():
+    draw_text(SURFACE_MAIN, "fps: " + str(int(CLOCK.get_fps())), (0,0), constants.COLOR_RED)
+
+def draw_messages():
+    if len(GAME_MESSAGES) <= constants.NUM_MESSAGES:
+        to_draw = GAME_MESSAGES
+    else:
+        to_draw = GAME_MESSAGES[-constants.NUM_MESSAGES:]
+
+    text_height = help_text_height(constants.MESSAGE_FONT)
+    start_y = (constants.MAP_HEIGHT*constants.CELL_HEIGHT - (constants.NUM_MESSAGES * text_height)) - 15
+
+    i = 0
+    for message, color in to_draw:
+        draw_text(SURFACE_MAIN, message, (0, start_y + (i * text_height)), color, constants.COLOR_BLACK) 
+        i += 1
+
+
+#HELPER FUNCTIONS
+def helper_text_objects(incoming_text, incoming_color, incoming_bg):
+    if incoming_bg:
+        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color, incoming_bg)
+    else:
+        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color)
+    return text_surface, text_surface.get_rect()
+
+def help_text_height(font):
+    '''Returns height of font passed in'''
+    font_obj = font.render('a', False, (0,0,0))
+    font_rect = font_obj.get_rect()
+    return font_rect.height()
 
 #GAME FUNCTIONS
 def game_main_loop():
@@ -196,20 +234,25 @@ def game_main_loop():
                 if obj.ai:
                     obj.ai.take_turn()
         draw_game()
+        CLOCK.tick(constants.GAME_FPS)
     pygame.quit()
 
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, GAME_MAP, PLAYER, ENEMY, GAME_OBJECTS, FOV_CALC
+    global SURFACE_MAIN, GAME_MAP, PLAYER, ENEMY, GAME_OBJECTS, FOV_CALC, CLOCK, GAME_MESSAGES
 
     #init pygame
     pygame.init()
+
+    CLOCK = pygame.time.Clock()
 
     SURFACE_MAIN = pygame.display.set_mode( (constants.MAP_WIDTH*constants.CELL_WIDTH, 
                                              constants.MAP_HEIGHT*constants.CELL_HEIGHT) )
 
     GAME_MAP = map_create()
+
+    GAME_MESSAGES = []
 
     FOV_CALC = True
 
@@ -247,6 +290,9 @@ def game_handle_keys():
                 FOV_CALC = True
                 return "player_moved"
     return "no-action"
+
+def game_message(game_msg, msg_color):
+    GAME_MESSAGES.append((game_msg, msg_color))
 
 if __name__ == '__main__':
     game_init()
