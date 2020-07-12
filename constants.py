@@ -27,10 +27,8 @@ COLOR_RED = (255,0,0)
 BACKGROUND_COLOR = COLOR_GREY
 
 #SPRITES
-S_PLAYER = pygame.image.load("assets/snake.png")
 S_WALL = pygame.image.load("assets/wall.jpg")
 S_FLOOR = pygame.image.load("assets/floor.jpg")
-S_CRAB = pygame.image.load("assets/crab.png")
 S_WALLEXPLORED = pygame.image.load("assets/wallunseen.png")
 S_FLOOREXPLORED = pygame.image.load("assets/floorunseen.png")
 

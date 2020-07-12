@@ -2,6 +2,7 @@
 import pygame
 import tcod as libtcodpy
 import constants
+import string
 
 #STRUCTS
 class struc_Tile:
@@ -11,11 +12,15 @@ class struc_Tile:
 
 #OBJECTS
 class obj_Actor:
-    def __init__(self, x, y, name_object, sprite, creature = None, ai = None):
+    def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None):
         self.x = x
         self.y = y
-        self.sprite = sprite
+        self.animation = animation
         self.name_object = name_object
+        self.animation_speed = animation_speed / 1.0
+        self.flicker = self.animation_speed/len(self.animation) 
+        self.flicker_timer = 0.0
+        self.sprite_image = 0
         
         self.creature = creature
         if creature:
@@ -28,8 +33,63 @@ class obj_Actor:
     def draw(self):
         is_visible = libtcodpy.map_is_in_fov(FOV_MAP, self.x, self.y)
         if is_visible:
-            SURFACE_MAIN.blit(self.sprite, ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
-    
+            if len(self.animation) == 1:
+                SURFACE_MAIN.blit(self.animation[0], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
+            else:
+                if CLOCK.get_fps() > 0.0:
+                    self.flicker_timer += 1/CLOCK.get_fps()
+                if self.flicker_timer >= self.flicker:
+                    self.flicker_timer = 0.0
+                    if self.sprite_image >= len(self.animation) - 1:
+                        self.sprite_image = 0
+                    else:
+                        self.sprite_image += 1
+                SURFACE_MAIN.blit(self.animation[self.sprite_image], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
+
+class obj_Game:
+    def __init__(self):
+        self.current_map = map_create()
+        self.current_objects = []
+
+        self.message_history = []
+        
+class obj_Spritesheet:
+    '''
+    Classs used to grab images from Spritesheet.
+    '''
+
+    def __init__(self, filename):
+        self.sprite_sheet = pygame.image.load(filename).convert()
+        self.tiledict = {char:index for index, char in enumerate(string.ascii_lowercase, 1)}
+    ################################
+
+    def get_image(self, column, row, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, scale = None):
+        image_list = []
+        
+        image = pygame.Surface([width, height]).convert()
+        image.blit(self.sprite_sheet, (0,0), (self.tiledict[column]*width, row*height, width, height))
+        image.set_colorkey(constants.COLOR_BLACK)
+        if scale:
+            (new_w, new_h) = scale
+            image = pygame.transform.scale(image, (new_w, new_h))
+        image_list.append(image)
+        return image_list
+        
+    def get_animation(self, column, row, num_sprites = 1, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, scale = None):
+        image_list = []
+
+        for i in range(num_sprites):
+            image = pygame.Surface([width, height]).convert()
+            image.blit(self.sprite_sheet, (0,0), (self.tiledict[column]*width+(width*i), row*height, width, height))
+            image.set_colorkey(constants.COLOR_BLACK)
+
+            if scale:
+                (new_w, new_h) = scale
+                image = pygame.transform.scale(image, (new_w, new_h))
+            image_list.append(image)
+
+        return image_list
+
 #COMPONENTS
 class com_Creature:
     '''Creatures have health, can dmg other objects. Can die.'''
@@ -42,7 +102,7 @@ class com_Creature:
 
     def move(self, dx, dy):
 
-        tile_is_wall = (GAME_MAP[self.owner.x + dx][self.owner.y + dy].block_path == True)
+        tile_is_wall = (GAME.current_map[self.owner.x + dx][self.owner.y + dy].block_path == True)
 
         target = map_check_for_creatures(self.owner.x + dx, self.owner.y + dy, self.owner)
          
@@ -54,7 +114,7 @@ class com_Creature:
             self.owner.y += dy
 
     def attack(self, target, damage):
-        game_message((self.name + " attacks " + target.creature.name + " for " + str(damage) + " damage!"), constants.COLOR_RED)
+        game_message((self.name + " attacks " + target.creature.name + " for " + str(damage) + " damage!"), constants.COLOR_WHITE)
         target.creature.take_damage(damage)
 
     def take_damage(self,damage):
@@ -74,7 +134,7 @@ class ai_Test:
 def death_monster(monster):
     '''On death, monster stops'''
 
-    print(monster.creature.name + " is dead!")
+    game_message((monster.creature.name + " is dead!"), constants.COLOR_GREY)
 
     monster.creature = None
     monster.ai = None
@@ -102,7 +162,7 @@ def map_check_for_creatures(x, y, exclude_object = None):
     target = None
     if exclude_object:
         #check object list for all creatures except excluded
-        for object in GAME_OBJECTS: 
+        for object in GAME.current_objects: 
             if (object is not exclude_object and 
                 object.x == x and 
                 object.y == y and 
@@ -115,7 +175,7 @@ def map_check_for_creatures(x, y, exclude_object = None):
     
     else:
         #check object list for any creature at location
-        for object in GAME_OBJECTS: 
+        for object in GAME.current_objects: 
             if (object.x == x and 
                 object.y == y and 
                 object.creature):
@@ -148,11 +208,12 @@ def draw_game():
     global SURFACE_MAIN
 
     SURFACE_MAIN.fill(constants.BACKGROUND_COLOR)
-    draw_map(GAME_MAP)
-    for obj in GAME_OBJECTS:
+    draw_map(GAME.current_map)
+    for obj in GAME.current_objects:
         obj.draw()
 
     draw_debug()
+    draw_messages()
     pygame.display.flip()
 
 def draw_map(map_to_draw):
@@ -190,10 +251,10 @@ def draw_debug():
     draw_text(SURFACE_MAIN, "fps: " + str(int(CLOCK.get_fps())), (0,0), constants.COLOR_RED)
 
 def draw_messages():
-    if len(GAME_MESSAGES) <= constants.NUM_MESSAGES:
-        to_draw = GAME_MESSAGES
+    if len(GAME.message_history) <= constants.NUM_MESSAGES:
+        to_draw = GAME.message_history
     else:
-        to_draw = GAME_MESSAGES[-constants.NUM_MESSAGES:]
+        to_draw = GAME.message_history[-constants.NUM_MESSAGES:]
 
     text_height = help_text_height(constants.MESSAGE_FONT)
     start_y = (constants.MAP_HEIGHT*constants.CELL_HEIGHT - (constants.NUM_MESSAGES * text_height)) - 15
@@ -216,7 +277,7 @@ def help_text_height(font):
     '''Returns height of font passed in'''
     font_obj = font.render('a', False, (0,0,0))
     font_rect = font_obj.get_rect()
-    return font_rect.height()
+    return font_rect.height
 
 #GAME FUNCTIONS
 def game_main_loop():
@@ -230,7 +291,7 @@ def game_main_loop():
         if player_action == "QUIT":
             game_quit = True
         elif player_action != "no-action":
-            for obj in GAME_OBJECTS:
+            for obj in GAME.current_objects:
                 if obj.ai:
                     obj.ai.take_turn()
         draw_game()
@@ -240,30 +301,31 @@ def game_main_loop():
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, GAME_MAP, PLAYER, ENEMY, GAME_OBJECTS, FOV_CALC, CLOCK, GAME_MESSAGES
+    global SURFACE_MAIN, GAME, FOV_CALC, CLOCK, PLAYER, ENEMY
 
     #init pygame
     pygame.init()
 
-    CLOCK = pygame.time.Clock()
-
     SURFACE_MAIN = pygame.display.set_mode( (constants.MAP_WIDTH*constants.CELL_WIDTH, 
                                              constants.MAP_HEIGHT*constants.CELL_HEIGHT) )
 
-    GAME_MAP = map_create()
-
-    GAME_MESSAGES = []
+    GAME = obj_Game()
 
     FOV_CALC = True
 
-    creature_com1 = com_Creature("Tom")
-    PLAYER = obj_Actor(1, 1, "Python", constants.S_PLAYER, creature=creature_com1)
+    CLOCK = pygame.time.Clock()
 
-    creature_com2 = com_Creature("Dave",  death_function = death_monster)
+    tempspritesheet = obj_Spritesheet("assets/reptile_sheet.png")
+    A_PLAYER = tempspritesheet.get_animation('c', 1, 2, 16, 16, (32,32))
+    A_ENEMY = tempspritesheet.get_animation('c', 3, 2, 16, 16, (32,32))
+    creature_com1 = com_Creature("Snake")
+    PLAYER = obj_Actor(1, 1, "Python", A_PLAYER, creature=creature_com1)
+
+    creature_com2 = com_Creature("Crab",  death_function = death_monster)
     ai_com = ai_Test()
-    ENEMY = obj_Actor(12, 12, "Crab", constants.S_CRAB, creature=creature_com2, ai = ai_com)
+    ENEMY = obj_Actor(12, 12, "Crab", A_ENEMY, creature=creature_com2, ai = ai_com)
 
-    GAME_OBJECTS = [ENEMY, PLAYER]
+    GAME.current_objects = [ENEMY, PLAYER]
 
 def game_handle_keys():
     global FOV_CALC
@@ -292,7 +354,7 @@ def game_handle_keys():
     return "no-action"
 
 def game_message(game_msg, msg_color):
-    GAME_MESSAGES.append((game_msg, msg_color))
+    GAME.message_history.append((game_msg, msg_color))
 
 if __name__ == '__main__':
     game_init()
