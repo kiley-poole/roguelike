@@ -1,5 +1,6 @@
 # pylint: disable=no-member
 import pygame
+import tcod as libtcodpy
 
 pygame.init()
 
@@ -23,6 +24,13 @@ BACKGROUND_COLOR = COLOR_GREY
 
 #SPRITES
 S_PLAYER = pygame.image.load("assets/snake.png")
-S_WALL = pygame.image.load("assets/wall.png")
+S_WALL = pygame.image.load("assets/wall.jpg")
 S_FLOOR = pygame.image.load("assets/floor.jpg")
 S_CRAB = pygame.image.load("assets/crab.png")
+S_WALLEXPLORED = pygame.image.load("assets/wallunseen.png")
+S_FLOOREXPLORED = pygame.image.load("assets/floorunseen.png")
+
+#FOV SETTINGS
+FOV_ALGO = libtcodpy.FOV_BASIC
+FOV_LIGHT_WALLS = True
+TORCH_RADIUS = 10
