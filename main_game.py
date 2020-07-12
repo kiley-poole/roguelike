@@ -10,6 +10,26 @@ class struc_Tile:
         self.block_path = block_path
         self.explored = False
 
+class struc_Assets:
+    def __init__(self):
+        #Objects
+        self.misc_items = obj_Spritesheet("assets/dg_misc32.gif")
+        self.dead_monster = self.misc_items.get_image('a', 7, 32, 32)
+
+        self.reptiles_spritesheet = obj_Spritesheet("assets/reptile_sheet.png")
+        self.A_PLAYER = self.reptiles_spritesheet.get_animation('c', 1, 2, 16, 16, (32,32))
+        self.A_ENEMY = self.reptiles_spritesheet.get_animation('c', 3, 2, 16, 16, (32,32))
+
+        #Sprites
+        self.S_WALL = pygame.image.load("assets/wall.jpg")
+        self.S_FLOOR = pygame.image.load("assets/floor.jpg")
+        self.S_WALLEXPLORED = pygame.image.load("assets/wallunseen.png")
+        self.S_FLOOREXPLORED = pygame.image.load("assets/floorunseen.png")
+        
+        #Fonts
+        self.MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
+        self.MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
+
 #OBJECTS
 class obj_Actor:
     def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None):
@@ -50,7 +70,6 @@ class obj_Game:
     def __init__(self):
         self.current_map = map_create()
         self.current_objects = []
-
         self.message_history = []
         
 class obj_Spritesheet:
@@ -68,7 +87,7 @@ class obj_Spritesheet:
         
         image = pygame.Surface([width, height]).convert()
         image.blit(self.sprite_sheet, (0,0), (self.tiledict[column]*width, row*height, width, height))
-        image.set_colorkey(constants.COLOR_BLACK)
+        image.set_colorkey(constants.COLOR_WHITE)
         if scale:
             (new_w, new_h) = scale
             image = pygame.transform.scale(image, (new_w, new_h))
@@ -136,6 +155,8 @@ def death_monster(monster):
 
     game_message((monster.creature.name + " is dead!"), constants.COLOR_GREY)
 
+
+    monster.animation = ASSETS.dead_monster
     monster.creature = None
     monster.ai = None
 
@@ -227,16 +248,16 @@ def draw_map(map_to_draw):
                 map_to_draw[x][y].explored = True
 
                 if map_to_draw[x][y].block_path == True:
-                    SURFACE_MAIN.blit(constants.S_WALL, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_WALL, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
                 else:
-                    SURFACE_MAIN.blit(constants.S_FLOOR, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_FLOOR, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
         
             elif map_to_draw[x][y].explored:
                 
                 if map_to_draw[x][y].block_path == True:
-                    SURFACE_MAIN.blit(constants.S_WALLEXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_WALLEXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
                 else:
-                    SURFACE_MAIN.blit(constants.S_FLOOREXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_FLOOREXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
 
 def draw_text(display_surface, text_to_display, T_coords, text_color, back_color = None):
     '''This function takes in text and displays it on the referenced surface'''
@@ -256,7 +277,7 @@ def draw_messages():
     else:
         to_draw = GAME.message_history[-constants.NUM_MESSAGES:]
 
-    text_height = help_text_height(constants.MESSAGE_FONT)
+    text_height = help_text_height(ASSETS.MESSAGE_FONT)
     start_y = (constants.MAP_HEIGHT*constants.CELL_HEIGHT - (constants.NUM_MESSAGES * text_height)) - 15
 
     i = 0
@@ -268,9 +289,9 @@ def draw_messages():
 #HELPER FUNCTIONS
 def helper_text_objects(incoming_text, incoming_color, incoming_bg):
     if incoming_bg:
-        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color, incoming_bg)
+        text_surface = ASSETS.MENU_FONT.render(incoming_text, False, incoming_color, incoming_bg)
     else:
-        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color)
+        text_surface = ASSETS.MENU_FONT.render(incoming_text, False, incoming_color)
     return text_surface, text_surface.get_rect()
 
 def help_text_height(font):
@@ -301,7 +322,7 @@ def game_main_loop():
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, GAME, FOV_CALC, CLOCK, PLAYER, ENEMY
+    global SURFACE_MAIN, GAME, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS
 
     #init pygame
     pygame.init()
@@ -313,17 +334,16 @@ def game_init():
 
     FOV_CALC = True
 
+    ASSETS = struc_Assets()
+
     CLOCK = pygame.time.Clock()
 
-    tempspritesheet = obj_Spritesheet("assets/reptile_sheet.png")
-    A_PLAYER = tempspritesheet.get_animation('c', 1, 2, 16, 16, (32,32))
-    A_ENEMY = tempspritesheet.get_animation('c', 3, 2, 16, 16, (32,32))
     creature_com1 = com_Creature("Snake")
-    PLAYER = obj_Actor(1, 1, "Python", A_PLAYER, creature=creature_com1)
+    PLAYER = obj_Actor(1, 1, "Python", ASSETS.A_PLAYER, creature=creature_com1)
 
     creature_com2 = com_Creature("Crab",  death_function = death_monster)
     ai_com = ai_Test()
-    ENEMY = obj_Actor(12, 12, "Crab", A_ENEMY, creature=creature_com2, ai = ai_com)
+    ENEMY = obj_Actor(12, 12, "Crab", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com)
 
     GAME.current_objects = [ENEMY, PLAYER]
 

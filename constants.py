@@ -26,20 +26,10 @@ COLOR_RED = (255,0,0)
 #Game Colors
 BACKGROUND_COLOR = COLOR_GREY
 
-#SPRITES
-S_WALL = pygame.image.load("assets/wall.jpg")
-S_FLOOR = pygame.image.load("assets/floor.jpg")
-S_WALLEXPLORED = pygame.image.load("assets/wallunseen.png")
-S_FLOOREXPLORED = pygame.image.load("assets/floorunseen.png")
-
 #FOV SETTINGS
 FOV_ALGO = libtcodpy.FOV_BASIC
 FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
-
-#FONTS
-MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
-MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
 
 #MESSAGE DEFAULTS
 NUM_MESSAGES = 4
