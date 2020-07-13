@@ -30,6 +30,7 @@ BACKGROUND_COLOR = COLOR_GREY
 FOV_ALGO = libtcodpy.FOV_BASIC
 FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
-
+MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
+MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
 #MESSAGE DEFAULTS
 NUM_MESSAGES = 4

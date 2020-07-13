@@ -14,25 +14,23 @@ class struc_Assets:
     def __init__(self):
         #Objects
         self.misc_items = obj_Spritesheet("assets/dg_misc32.gif")
-        self.dead_monster = self.misc_items.get_image('a', 7, 32, 32)
+        self.dead_monster = self.misc_items.get_image('a', 7, 32, 32,constants.COLOR_WHITE)
 
         self.reptiles_spritesheet = obj_Spritesheet("assets/reptile_sheet.png")
-        self.A_PLAYER = self.reptiles_spritesheet.get_animation('c', 1, 2, 16, 16, (32,32))
-        self.A_ENEMY = self.reptiles_spritesheet.get_animation('c', 3, 2, 16, 16, (32,32))
+        self.A_PLAYER = self.reptiles_spritesheet.get_animation('c', 1, 2, 16, 16, constants.COLOR_BLACK, (32,32))
+        self.A_ENEMY = self.reptiles_spritesheet.get_animation('c', 3, 2, 16, 16, constants.COLOR_BLACK, (32,32))
 
         #Sprites
-        self.S_WALL = pygame.image.load("assets/wall.jpg")
-        self.S_FLOOR = pygame.image.load("assets/floor.jpg")
-        self.S_WALLEXPLORED = pygame.image.load("assets/wallunseen.png")
-        self.S_FLOOREXPLORED = pygame.image.load("assets/floorunseen.png")
+        self.terrain = obj_Spritesheet("assets/dg_extra132.gif")
+        self.S_WALL = self.terrain.get_image('a', 11, 32, 32,constants.COLOR_WHITE)
+        self.S_FLOOR = self.terrain.get_image('c', 12, 32, 32,constants.COLOR_WHITE)
+        self.S_WALLEXPLORED = self.terrain.get_image('e', 11, 32, 32,constants.COLOR_WHITE)
+        self.S_FLOOREXPLORED = self.terrain.get_image('e', 12, 32, 32,constants.COLOR_WHITE)
         
-        #Fonts
-        self.MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
-        self.MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
 
 #OBJECTS
 class obj_Actor:
-    def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None):
+    def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None, container = None, item = None):
         self.x = x
         self.y = y
         self.animation = animation
@@ -44,11 +42,20 @@ class obj_Actor:
         
         self.creature = creature
         if creature:
-            creature.owner = self
+            self.creature.owner = self
         
         self.ai = ai
         if ai:
-            ai.owner = self
+            self.ai.owner = self
+        
+        self.container = container
+        if container:
+            self.container.owner = self
+    
+        self.item = item
+        if item:
+            self.item.owner = self
+
 
     def draw(self):
         is_visible = libtcodpy.map_is_in_fov(FOV_MAP, self.x, self.y)
@@ -82,25 +89,25 @@ class obj_Spritesheet:
         self.tiledict = {char:index for index, char in enumerate(string.ascii_lowercase, 1)}
     ################################
 
-    def get_image(self, column, row, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, scale = None):
+    def get_image(self, column, row, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, color_key = constants.COLOR_BLACK, scale = None):
         image_list = []
         
         image = pygame.Surface([width, height]).convert()
         image.blit(self.sprite_sheet, (0,0), (self.tiledict[column]*width, row*height, width, height))
-        image.set_colorkey(constants.COLOR_WHITE)
+        image.set_colorkey(color_key)
         if scale:
             (new_w, new_h) = scale
             image = pygame.transform.scale(image, (new_w, new_h))
         image_list.append(image)
         return image_list
         
-    def get_animation(self, column, row, num_sprites = 1, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, scale = None):
+    def get_animation(self, column, row, num_sprites = 1, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, color_key = constants.COLOR_BLACK, scale = None):
         image_list = []
 
         for i in range(num_sprites):
             image = pygame.Surface([width, height]).convert()
             image.blit(self.sprite_sheet, (0,0), (self.tiledict[column]*width+(width*i), row*height, width, height))
-            image.set_colorkey(constants.COLOR_BLACK)
+            image.set_colorkey(color_key)
 
             if scale:
                 (new_w, new_h) = scale
@@ -144,6 +151,39 @@ class com_Creature:
             if self.death_function is not None:
                 self.death_function(self.owner)
 
+class com_Container:
+    def __init__(self, volume = 10.0, inventory = None):
+        if inventory is None:
+            self.inventory = []
+        else:
+            self.inventory = inventory
+        self.max_volume = volume
+    
+    @property
+    def volume(self):
+        return 0.0
+    
+class com_Item:
+    def __init__(self, weight = 0.0, volume = 0.0):
+        self.weight = weight
+        self.volume = volume
+    
+    def pick_up(self, actor):
+        if actor.container:
+            if actor.container.volume + self.volume > actor.container.max_volume:
+               game_message("Not enough space in your inventory!", constants.COLOR_RED)
+            else:
+                game_message("Picked Up", constants.COLOR_WHITE)
+                actor.container.inventory.append(self.owner)
+                GAME.current_objects.remove(self.owner)
+                self.container = actor.container
+    
+    def drop(self, pos_x, pos_y):
+        GAME.current_objects.append(self.owner)
+        self.container.inventory.remove(self.owner)
+        self.owner.x = pos_x
+        self.owner.y = pos_y
+        game_message("Item Dropped!", constants.COLOR_WHITE)
 #AI
 class ai_Test:
     '''Once per turn execute'''
@@ -223,6 +263,9 @@ def map_calc_fov():
         FOV_CALC = False
         libtcodpy.map_compute_fov(FOV_MAP, PLAYER.x, PLAYER.y, constants.TORCH_RADIUS, constants.FOV_LIGHT_WALLS, constants.FOV_ALGO)
 
+def map_objects_at_coords(pos_x, pos_y):
+    objects_options = [obj for obj in GAME.current_objects if obj.x == pos_x and obj.y == pos_y]
+    return objects_options
 #DRAW FUNCTIONS
 def draw_game():
 
@@ -248,16 +291,16 @@ def draw_map(map_to_draw):
                 map_to_draw[x][y].explored = True
 
                 if map_to_draw[x][y].block_path == True:
-                    SURFACE_MAIN.blit(ASSETS.S_WALL, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_WALL[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
                 else:
-                    SURFACE_MAIN.blit(ASSETS.S_FLOOR, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_FLOOR[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
         
             elif map_to_draw[x][y].explored:
                 
                 if map_to_draw[x][y].block_path == True:
-                    SURFACE_MAIN.blit(ASSETS.S_WALLEXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_WALLEXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
                 else:
-                    SURFACE_MAIN.blit(ASSETS.S_FLOOREXPLORED, (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAIN.blit(ASSETS.S_FLOOREXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
 
 def draw_text(display_surface, text_to_display, T_coords, text_color, back_color = None):
     '''This function takes in text and displays it on the referenced surface'''
@@ -277,7 +320,7 @@ def draw_messages():
     else:
         to_draw = GAME.message_history[-constants.NUM_MESSAGES:]
 
-    text_height = help_text_height(ASSETS.MESSAGE_FONT)
+    text_height = helper_text_size(constants.MESSAGE_FONT)
     start_y = (constants.MAP_HEIGHT*constants.CELL_HEIGHT - (constants.NUM_MESSAGES * text_height)) - 15
 
     i = 0
@@ -285,20 +328,97 @@ def draw_messages():
         draw_text(SURFACE_MAIN, message, (0, start_y + (i * text_height)), color, constants.COLOR_BLACK) 
         i += 1
 
-
 #HELPER FUNCTIONS
 def helper_text_objects(incoming_text, incoming_color, incoming_bg):
     if incoming_bg:
-        text_surface = ASSETS.MENU_FONT.render(incoming_text, False, incoming_color, incoming_bg)
+        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color, incoming_bg)
     else:
-        text_surface = ASSETS.MENU_FONT.render(incoming_text, False, incoming_color)
+        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color)
     return text_surface, text_surface.get_rect()
 
-def help_text_height(font):
+def helper_text_size(font):
     '''Returns height of font passed in'''
     font_obj = font.render('a', False, (0,0,0))
     font_rect = font_obj.get_rect()
     return font_rect.height
+
+#MENUS
+def menu_pause():
+    '''
+    Pauses Game and displays menu
+    '''
+    menu_close = False
+
+    window_width = constants.MAP_WIDTH * constants.CELL_WIDTH
+    window_height = constants.MAP_HEIGHT * constants.CELL_HEIGHT
+    menu_text = "PAUSED"
+    menu_font = constants.MESSAGE_FONT
+    text_height = helper_text_size(menu_font)
+    text_width = len(menu_text) * helper_text_size(menu_font)
+
+    while not menu_close:
+        events_list = pygame.event.get()
+        for event in events_list:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    menu_close = True
+        draw_text(SURFACE_MAIN, menu_text, ((window_width/2) - (text_width/2), (window_height/2) - (text_height/2)), constants.COLOR_WHITE, constants.COLOR_BLACK)
+        CLOCK.tick(constants.GAME_FPS)
+        pygame.display.flip()
+
+def menu_inventory():
+    window_width = constants.MAP_WIDTH * constants.CELL_WIDTH
+    window_height = constants.MAP_HEIGHT * constants.CELL_HEIGHT
+
+    menu_close = False
+
+    menu_height = 200
+    menu_width = 200
+    menu_x = int(window_width/2)-int(menu_width/2)
+    menu_y = int(window_height/2)-int(menu_height/2)
+
+    menu_text_font = constants.MESSAGE_FONT
+    menu_text_height = helper_text_size(menu_text_font)
+
+    local_inventory_surface = pygame.Surface((menu_width, menu_height))
+
+    while not menu_close:
+        local_inventory_surface.fill(constants.COLOR_BLACK)
+
+        print_list = [obj.name_object for obj in PLAYER.container.inventory]
+
+        events_list = pygame.event.get()
+        mouse_x,mouse_y = pygame.mouse.get_pos()
+        
+        mouse_x_rel = mouse_x - menu_x
+        mouse_y_rel = mouse_y - menu_x
+
+        mouse_in_window = mouse_x_rel > 0 and mouse_y_rel > 0 and mouse_x_rel < menu_width and mouse_y_rel < menu_height
+        mouse_line_selection = int(mouse_y_rel) / int(menu_text_height)
+
+        if mouse_in_window:
+            print(int(mouse_line_selection))
+            print(len(print_list))
+
+        for event in events_list:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_i:
+                    menu_close = True
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    if (int(mouse_in_window) and int(mouse_line_selection) <= int(len(print_list)) -1):
+                        PLAYER.container.inventory[int(mouse_line_selection)].item.drop(PLAYER.x, PLAYER.y)
+            
+        for line, (name) in enumerate(print_list):
+            if line == int(mouse_line_selection) and mouse_in_window:
+                draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.COLOR_GREY)
+            else:
+                draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.COLOR_BLACK)
+
+    
+        SURFACE_MAIN.blit(local_inventory_surface, (menu_x,menu_y))
+        CLOCK.tick(constants.GAME_FPS)
+        pygame.display.update()
 
 #GAME FUNCTIONS
 def game_main_loop():
@@ -326,6 +446,7 @@ def game_init():
 
     #init pygame
     pygame.init()
+    pygame.key.set_repeat(200,70)
 
     SURFACE_MAIN = pygame.display.set_mode( (constants.MAP_WIDTH*constants.CELL_WIDTH, 
                                              constants.MAP_HEIGHT*constants.CELL_HEIGHT) )
@@ -338,12 +459,14 @@ def game_init():
 
     CLOCK = pygame.time.Clock()
 
+    item_com1 = com_Item()
+    container_com1 = com_Container()
     creature_com1 = com_Creature("Snake")
-    PLAYER = obj_Actor(1, 1, "Python", ASSETS.A_PLAYER, creature=creature_com1)
+    PLAYER = obj_Actor(1, 1, "Python", ASSETS.A_PLAYER, creature=creature_com1, container=container_com1)
 
     creature_com2 = com_Creature("Crab",  death_function = death_monster)
     ai_com = ai_Test()
-    ENEMY = obj_Actor(12, 12, "Crab", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com)
+    ENEMY = obj_Actor(12, 12, "Crab", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com, item = item_com1)
 
     GAME.current_objects = [ENEMY, PLAYER]
 
@@ -371,6 +494,19 @@ def game_handle_keys():
                 PLAYER.creature.move(1,0)
                 FOV_CALC = True
                 return "player_moved"
+            if event.key == pygame.K_g:
+                objects_at_player = map_objects_at_coords(PLAYER.x, PLAYER.y)
+                for obj in objects_at_player:
+                    if obj.item:
+                        obj.item.pick_up(PLAYER)
+                return "player_moved"
+            if event.key == pygame.K_d:
+                if len(PLAYER.container.inventory) > 0:
+                    PLAYER.container.inventory[-1].item.drop(PLAYER.x, PLAYER.y)
+            if event.key == pygame.K_ESCAPE:
+                menu_pause()
+            if event.key == pygame.K_i:
+                menu_inventory()
     return "no-action"
 
 def game_message(game_msg, msg_color):
