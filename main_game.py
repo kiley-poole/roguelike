@@ -151,6 +151,10 @@ class com_Creature:
             if self.death_function is not None:
                 self.death_function(self.owner)
 
+    def heal(self, value):
+        self.hp += value
+        if self.hp > self.maxhp:
+            self.hp = self.maxhp
 class com_Container:
     def __init__(self, volume = 10.0, inventory = None):
         if inventory is None:
@@ -164,9 +168,11 @@ class com_Container:
         return 0.0
     
 class com_Item:
-    def __init__(self, weight = 0.0, volume = 0.0):
+    def __init__(self, weight = 0.0, volume = 0.0, use_function = None, value = None):
         self.weight = weight
         self.volume = volume
+        self.value = value
+        self.use_function = use_function
     
     def pick_up(self, actor):
         if actor.container:
@@ -184,6 +190,18 @@ class com_Item:
         self.owner.x = pos_x
         self.owner.y = pos_y
         game_message("Item Dropped!", constants.COLOR_WHITE)
+
+    def use(self):
+        '''Uses item 
+            Currently only consumables        
+        '''
+        if self.use_function:
+            result = self.use_function(self.container.owner, self.value)
+
+            if result is not None:
+                print("use failed.")
+            else:
+                self.container.inventory.remove(self.owner)
 #AI
 class ai_Test:
     '''Once per turn execute'''
@@ -278,7 +296,6 @@ def draw_game():
 
     draw_debug()
     draw_messages()
-    pygame.display.flip()
 
 def draw_map(map_to_draw):
     for x in range(0, constants.MAP_WIDTH):
@@ -328,6 +345,17 @@ def draw_messages():
         draw_text(SURFACE_MAIN, message, (0, start_y + (i * text_height)), color, constants.COLOR_BLACK) 
         i += 1
 
+def draw_tile_rect(coords):
+    x, y = coords
+    new_x = x * constants.CELL_WIDTH
+    new_y = y * constants.CELL_HEIGHT
+    new_surface = pygame.Surface((constants.CELL_WIDTH, constants.CELL_HEIGHT))
+    new_surface.fill(constants.COLOR_WHITE)
+    new_surface.set_alpha(150)
+    SURFACE_MAIN.blit(new_surface, (new_x, new_y))
+    
+
+
 #HELPER FUNCTIONS
 def helper_text_objects(incoming_text, incoming_color, incoming_bg):
     if incoming_bg:
@@ -341,6 +369,17 @@ def helper_text_size(font):
     font_obj = font.render('a', False, (0,0,0))
     font_rect = font_obj.get_rect()
     return font_rect.height
+
+#MAGIC
+def cast_heal(target, value):
+    if target.creature.hp == target.creature.maxhp:
+       game_message(target.creature.name + " the " + target.name_object + " is at full HP!", constants.COLOR_WHITE) 
+       return "cancelled"
+    else:    
+       game_message(target.creature.name + " the " + target.name_object + " healed for " + str(value) + " HP!", constants.COLOR_WHITE)
+       target.creature.heal(value)
+       game_message("Current HP is " + str(target.creature.hp) + '/' + str(target.creature.maxhp), constants.COLOR_WHITE)
+    return None
 
 #MENUS
 def menu_pause():
@@ -396,10 +435,6 @@ def menu_inventory():
         mouse_in_window = mouse_x_rel > 0 and mouse_y_rel > 0 and mouse_x_rel < menu_width and mouse_y_rel < menu_height
         mouse_line_selection = int(mouse_y_rel) / int(menu_text_height)
 
-        if mouse_in_window:
-            print(int(mouse_line_selection))
-            print(len(print_list))
-
         for event in events_list:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_i:
@@ -407,7 +442,7 @@ def menu_inventory():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     if (int(mouse_in_window) and int(mouse_line_selection) <= int(len(print_list)) -1):
-                        PLAYER.container.inventory[int(mouse_line_selection)].item.drop(PLAYER.x, PLAYER.y)
+                        PLAYER.container.inventory[int(mouse_line_selection)].item.use()
             
         for line, (name) in enumerate(print_list):
             if line == int(mouse_line_selection) and mouse_in_window:
@@ -419,6 +454,30 @@ def menu_inventory():
         SURFACE_MAIN.blit(local_inventory_surface, (menu_x,menu_y))
         CLOCK.tick(constants.GAME_FPS)
         pygame.display.update()
+
+def menu_target_select():
+    '''This menu lets the player select a tile.
+
+    This function pauses, the game, produces an on screen square and when the player presses the left MB, will return map address.
+    '''
+    menu_close = False
+    while not menu_close:
+        mouse_x,mouse_y = pygame.mouse.get_pos()
+        events_list = pygame.event.get()
+        mouse_x_rel = mouse_x//constants.CELL_WIDTH
+        mouse_y_rel = mouse_y//constants.CELL_HEIGHT
+        for event in events_list:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_l:
+                    menu_close = True
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    None
+        draw_game()
+        draw_tile_rect((mouse_x_rel, mouse_y_rel))
+        pygame.display.flip()
+        CLOCK.tick(constants.GAME_FPS)
+    
 
 #GAME FUNCTIONS
 def game_main_loop():
@@ -436,6 +495,7 @@ def game_main_loop():
                 if obj.ai:
                     obj.ai.take_turn()
         draw_game()
+        pygame.display.flip()
         CLOCK.tick(constants.GAME_FPS)
     pygame.quit()
 
@@ -459,7 +519,7 @@ def game_init():
 
     CLOCK = pygame.time.Clock()
 
-    item_com1 = com_Item()
+    item_com1 = com_Item(value = 4, use_function = cast_heal)
     container_com1 = com_Container()
     creature_com1 = com_Creature("Snake")
     PLAYER = obj_Actor(1, 1, "Python", ASSETS.A_PLAYER, creature=creature_com1, container=container_com1)
@@ -507,6 +567,8 @@ def game_handle_keys():
                 menu_pause()
             if event.key == pygame.K_i:
                 menu_inventory()
+            if event.key == pygame.K_l:
+                menu_target_select()
     return "no-action"
 
 def game_message(game_msg, msg_color):
