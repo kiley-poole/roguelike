@@ -145,6 +145,8 @@ class com_Creature:
 
     def take_damage(self,damage):
         self.hp -= damage
+        if self.hp <= 0:
+            self.hp = 0
         game_message(self.name + "'s health is " + str(self.hp) + "/" + str(self.maxhp), constants.COLOR_RED)
 
         if self.hp <= 0:
@@ -284,6 +286,30 @@ def map_calc_fov():
 def map_objects_at_coords(pos_x, pos_y):
     objects_options = [obj for obj in GAME.current_objects if obj.x == pos_x and obj.y == pos_y]
     return objects_options
+
+def map_find_line(coords1, coords2):
+    '''Converts two x,y coords into list of tiles'''
+
+    x1, y1 = coords1
+    x2, y2 = coords2
+
+    libtcodpy.line_init(x1,y1,x2,y2)
+
+    cur_x, cur_y = libtcodpy.line_step()
+
+    coord_list = []
+
+    if x1 == x2 and y1 == y2:
+        return [coords1]
+    
+    while(not cur_x is None):
+        coord_list.append((cur_x, cur_y))
+        
+        cur_x, cur_y = libtcodpy.line_step()
+
+    return coord_list
+
+
 #DRAW FUNCTIONS
 def draw_game():
 
@@ -381,6 +407,18 @@ def cast_heal(target, value):
        game_message("Current HP is " + str(target.creature.hp) + '/' + str(target.creature.maxhp), constants.COLOR_WHITE)
     return None
 
+def cast_lightning(value):
+    tile_selected = menu_target_select()
+
+    list_of_tiles = map_find_line((PLAYER.x, PLAYER.y), tile_selected)
+
+    for i, (x,y) in enumerate(list_of_tiles):
+        target = map_check_for_creatures(x,y)
+        if target and i != 0:
+            target.creature.take_damage(value)
+
+
+
 #MENUS
 def menu_pause():
     '''
@@ -472,7 +510,7 @@ def menu_target_select():
                     menu_close = True
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    None
+                    return(mouse_x_rel, mouse_y_rel)
         draw_game()
         draw_tile_rect((mouse_x_rel, mouse_y_rel))
         pygame.display.flip()
@@ -568,7 +606,7 @@ def game_handle_keys():
             if event.key == pygame.K_i:
                 menu_inventory()
             if event.key == pygame.K_l:
-                menu_target_select()
+                cast_lightning(1)
     return "no-action"
 
 def game_message(game_msg, msg_color):
