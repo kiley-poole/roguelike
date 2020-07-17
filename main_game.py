@@ -309,7 +309,6 @@ def map_find_line(coords1, coords2):
 
     return coord_list
 
-
 #DRAW FUNCTIONS
 def draw_game():
 
@@ -380,8 +379,6 @@ def draw_tile_rect(coords):
     new_surface.set_alpha(150)
     SURFACE_MAIN.blit(new_surface, (new_x, new_y))
     
-
-
 #HELPER FUNCTIONS
 def helper_text_objects(incoming_text, incoming_color, incoming_bg):
     if incoming_bg:
@@ -408,14 +405,17 @@ def cast_heal(target, value):
     return None
 
 def cast_lightning(value):
-    tile_selected = menu_target_select()
 
-    list_of_tiles = map_find_line((PLAYER.x, PLAYER.y), tile_selected)
+    player_locat = (PLAYER.x, PLAYER.y)
 
-    for i, (x,y) in enumerate(list_of_tiles):
-        target = map_check_for_creatures(x,y)
-        if target and i != 0:
-            target.creature.take_damage(value)
+    tile_selected = menu_target_select(coords_origin = player_locat, range = 5, pen_walls=False)
+    if tile_selected:
+        list_of_tiles = map_find_line(player_locat, tile_selected)
+
+        for i, (x,y) in enumerate(list_of_tiles):
+            target = map_check_for_creatures(x,y)
+            if target:
+                target.creature.take_damage(value)
 
 
 
@@ -493,26 +493,40 @@ def menu_inventory():
         CLOCK.tick(constants.GAME_FPS)
         pygame.display.update()
 
-def menu_target_select():
+def menu_target_select(coords_origin = None, range = None, pen_walls = True):
     '''This menu lets the player select a tile.
 
     This function pauses, the game, produces an on screen square and when the player presses the left MB, will return map address.
     '''
     menu_close = False
     while not menu_close:
+
         mouse_x,mouse_y = pygame.mouse.get_pos()
         events_list = pygame.event.get()
         mouse_x_rel = mouse_x//constants.CELL_WIDTH
         mouse_y_rel = mouse_y//constants.CELL_HEIGHT
+        valid_tiles=[]
+        if coords_origin:
+            list_of_tiles = map_find_line(coords_origin, (mouse_x_rel,mouse_y_rel))
+            for i, (x, y) in enumerate(list_of_tiles):
+                valid_tiles.append((x,y))
+                if range and i == range-1:
+                    break
+                if pen_walls == False:
+                     if GAME.current_map[x][y].block_path: break
+        else:
+            valid_tiles = [(mouse_x_rel, mouse_y_rel)]
+            
         for event in events_list:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_l:
                     menu_close = True
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    return(mouse_x_rel, mouse_y_rel)
+                    return(valid_tiles[-1])
         draw_game()
-        draw_tile_rect((mouse_x_rel, mouse_y_rel))
+        for (tile_x, tile_y) in valid_tiles:
+            draw_tile_rect((tile_x, tile_y))
         pygame.display.flip()
         CLOCK.tick(constants.GAME_FPS)
     
