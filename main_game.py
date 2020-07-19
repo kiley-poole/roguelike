@@ -3,6 +3,7 @@ import pygame
 import tcod as libtcodpy
 import constants
 import string
+import math
 
 #STRUCTS
 class struc_Tile:
@@ -56,7 +57,6 @@ class obj_Actor:
         if item:
             self.item.owner = self
 
-
     def draw(self):
         is_visible = libtcodpy.map_is_in_fov(FOV_MAP, self.x, self.y)
         if is_visible:
@@ -72,6 +72,26 @@ class obj_Actor:
                     else:
                         self.sprite_image += 1
                 SURFACE_MAIN.blit(self.animation[self.sprite_image], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
+
+    def distance_to(self, other):
+        
+        dx = other.x - self.x
+        dy = other.y - self.y
+
+        return math.sqrt(dx ** 2 + dy ** 2)
+    
+    def move_towards(self,other):
+
+        dx = other.x - self.x
+        dy = other.y - self.y
+
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+
+        dx = int(round(dx/distance))
+        dy = int(round(dy/distance))
+
+        self.creature.move(dx,dy)
+        
 
 class obj_Game:
     def __init__(self):
@@ -210,6 +230,18 @@ class ai_Test:
     def take_turn(self):
         self.owner.creature.move(libtcodpy.random_get_int(0, -1, 1), libtcodpy.random_get_int(0, -1, 1))
 
+class ai_Chase:
+    '''
+    A basic monster ai which chases and harms player
+    '''
+    def take_turn(self):
+        monster = self.owner
+        if libtcodpy.map_is_in_fov(FOV_MAP, monster.x, monster.y):
+            if monster.distance_to(PLAYER) >= 2:
+                self.owner.move_towards(PLAYER)
+            elif PLAYER.creature.current_hp > 0:
+                monster.creature.attack(PLAYER, 3)
+
 def death_monster(monster):
     '''On death, monster stops'''
 
@@ -309,6 +341,17 @@ def map_find_line(coords1, coords2):
 
     return coord_list
 
+def map_find_radius(coords, radius):
+    tile_x, tile_y = coords
+    tile_list = []
+    start_y = tile_y - radius
+    start_x = tile_x - radius
+
+    for x in range(radius*2+1):
+        for y in range(radius*2+1):
+            tile_list.append((start_x+y, start_y+x))
+
+    return tile_list
 #DRAW FUNCTIONS
 def draw_game():
 
@@ -417,7 +460,26 @@ def cast_lightning(value):
             if target:
                 target.creature.take_damage(value)
 
+def cast_fireball(value):
+    intneral_radius = 1
+    max_range = 4
+    player_locat = (PLAYER.x, PLAYER.y)
 
+    tile_selected = menu_target_select(coords_origin = player_locat, range = max_range, pen_walls=False, pen_creature=False, radius=intneral_radius)
+    
+    tiles_to_damage = map_find_radius(tile_selected, intneral_radius)
+
+    creature_hit = False
+
+    for (x,y) in tiles_to_damage:
+        creature_to_dmg = map_check_for_creatures(x,y)
+        if creature_to_dmg:
+            creature_to_dmg.creature.take_damage(value)
+            if creature_to_dmg is not PLAYER:
+                creature_hit = True
+    
+    if creature_hit:
+        game_message("The fireball fucks shit up hardcore!", constants.COLOR_RED)
 
 #MENUS
 def menu_pause():
@@ -493,7 +555,7 @@ def menu_inventory():
         CLOCK.tick(constants.GAME_FPS)
         pygame.display.update()
 
-def menu_target_select(coords_origin = None, range = None, pen_walls = True):
+def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen_creature = True, radius = None):
     '''This menu lets the player select a tile.
 
     This function pauses, the game, produces an on screen square and when the player presses the left MB, will return map address.
@@ -514,6 +576,8 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True):
                     break
                 if pen_walls == False:
                      if GAME.current_map[x][y].block_path: break
+                if pen_creature == False and map_check_for_creatures(x,y):
+                    break
         else:
             valid_tiles = [(mouse_x_rel, mouse_y_rel)]
             
@@ -527,6 +591,10 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True):
         draw_game()
         for (tile_x, tile_y) in valid_tiles:
             draw_tile_rect((tile_x, tile_y))
+        if radius:
+            area_effect = map_find_radius(valid_tiles[-1], radius)
+            for (rad_x, rad_y) in area_effect:
+                    draw_tile_rect((rad_x, rad_y))
         pygame.display.flip()
         CLOCK.tick(constants.GAME_FPS)
     
@@ -577,7 +645,7 @@ def game_init():
     PLAYER = obj_Actor(1, 1, "Python", ASSETS.A_PLAYER, creature=creature_com1, container=container_com1)
 
     creature_com2 = com_Creature("Crab",  death_function = death_monster)
-    ai_com = ai_Test()
+    ai_com = ai_Chase()
     ENEMY = obj_Actor(12, 12, "Crab", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com, item = item_com1)
 
     GAME.current_objects = [ENEMY, PLAYER]
@@ -620,7 +688,7 @@ def game_handle_keys():
             if event.key == pygame.K_i:
                 menu_inventory()
             if event.key == pygame.K_l:
-                cast_lightning(1)
+                cast_fireball(10)
     return "no-action"
 
 def game_message(game_msg, msg_color):
