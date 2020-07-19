@@ -1,4 +1,3 @@
-# pylint: disable=no-member
 import pygame
 import tcod as libtcodpy
 import constants
@@ -74,12 +73,12 @@ class obj_Actor:
                 SURFACE_MAIN.blit(self.animation[self.sprite_image], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
 
     def distance_to(self, other):
-        
+
         dx = other.x - self.x
         dy = other.y - self.y
 
         return math.sqrt(dx ** 2 + dy ** 2)
-    
+
     def move_towards(self,other):
 
         dx = other.x - self.x
@@ -225,21 +224,30 @@ class com_Item:
             else:
                 self.container.inventory.remove(self.owner)
 #AI
-class ai_Test:
+class ai_Confuse:
     '''Once per turn execute'''
+    def __init__(self, old_ai, num_turns):
+        self.old_ai = old_ai
+        self.num_turns = num_turns
     def take_turn(self):
-        self.owner.creature.move(libtcodpy.random_get_int(0, -1, 1), libtcodpy.random_get_int(0, -1, 1))
+        if self.num_turns > 0:
+            self.owner.creature.move(libtcodpy.random_get_int(0, -1, 1), libtcodpy.random_get_int(0, -1, 1))
+            self.num_turns -= 1
+        else:
+            self.owner.ai = self.old_ai
+            game_message("No longer confused", constants.COLOR_WHITE)
 
 class ai_Chase:
     '''
     A basic monster ai which chases and harms player
     '''
+
     def take_turn(self):
         monster = self.owner
         if libtcodpy.map_is_in_fov(FOV_MAP, monster.x, monster.y):
             if monster.distance_to(PLAYER) >= 2:
                 self.owner.move_towards(PLAYER)
-            elif PLAYER.creature.current_hp > 0:
+            elif PLAYER.creature.hp > 0:
                 monster.creature.attack(PLAYER, 3)
 
 def death_monster(monster):
@@ -387,17 +395,20 @@ def draw_map(map_to_draw):
                 else:
                     SURFACE_MAIN.blit(ASSETS.S_FLOOREXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
 
-def draw_text(display_surface, text_to_display, T_coords, text_color, back_color = None):
+def draw_text(display_surface, text_to_display, T_coords, text_color, font=constants.MENU_FONT, back_color = None, center = False):
     '''This function takes in text and displays it on the referenced surface'''
 
-    text_surf, text_rect = helper_text_objects(text_to_display, text_color, back_color)
+    text_surf, text_rect = helper_text_objects(text_to_display, font, text_color, back_color)
 
-    text_rect.topleft = T_coords
+    if not center:
+        text_rect.topleft = T_coords
+    else:
+        text_rect.center = T_coords
 
     display_surface.blit(text_surf, text_rect)
 
 def draw_debug():
-    draw_text(SURFACE_MAIN, "fps: " + str(int(CLOCK.get_fps())), (0,0), constants.COLOR_RED)
+    draw_text(SURFACE_MAIN, "fps: " + str(int(CLOCK.get_fps())), font=constants.MENU_FONT, T_coords = (0,0), text_color = constants.COLOR_RED)
 
 def draw_messages():
     if len(GAME.message_history) <= constants.NUM_MESSAGES:
@@ -410,24 +421,34 @@ def draw_messages():
 
     i = 0
     for message, color in to_draw:
-        draw_text(SURFACE_MAIN, message, (0, start_y + (i * text_height)), color, constants.COLOR_BLACK) 
+        draw_text(SURFACE_MAIN, message, (0, start_y + (i * text_height)), color, constants.MESSAGE_FONT, constants.COLOR_BLACK) 
         i += 1
 
-def draw_tile_rect(coords):
+def draw_tile_rect(coords, tile_color = None, tile_alpha = None, mark = None):
     x, y = coords
+
+    if tile_color: local_color = tile_color
+    else: local_color = constants.COLOR_WHITE
+
+    if tile_alpha: local_alpha = tile_alpha
+    else: local_alpha = 200
+
     new_x = x * constants.CELL_WIDTH
     new_y = y * constants.CELL_HEIGHT
     new_surface = pygame.Surface((constants.CELL_WIDTH, constants.CELL_HEIGHT))
-    new_surface.fill(constants.COLOR_WHITE)
-    new_surface.set_alpha(150)
+    new_surface.fill(local_color)
+    new_surface.set_alpha(local_alpha)
+
+    if mark:
+        draw_text(new_surface, mark, T_coords= (constants.CELL_WIDTH/2, constants.CELL_HEIGHT/2), text_color=constants.COLOR_BLACK, font = constants.CURSOR_TEXT, center=True )
     SURFACE_MAIN.blit(new_surface, (new_x, new_y))
     
 #HELPER FUNCTIONS
-def helper_text_objects(incoming_text, incoming_color, incoming_bg):
+def helper_text_objects(incoming_text, font, incoming_color, incoming_bg):
     if incoming_bg:
-        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color, incoming_bg)
+        text_surface = font.render(incoming_text, False, incoming_color, incoming_bg)
     else:
-        text_surface = constants.MENU_FONT.render(incoming_text, False, incoming_color)
+        text_surface = font.render(incoming_text, False, incoming_color)
     return text_surface, text_surface.get_rect()
 
 def helper_text_size(font):
@@ -481,6 +502,18 @@ def cast_fireball(value):
     if creature_hit:
         game_message("The fireball fucks shit up hardcore!", constants.COLOR_RED)
 
+def cast_confusion():
+    tile_selected = menu_target_select()
+    if tile_selected:
+        x,y = tile_selected
+        target=  map_check_for_creatures(x,y)
+        if target:
+            oldai = target.ai
+            target.ai = ai_Confuse(old_ai = oldai, num_turns = 5)
+            target.ai.owner = target
+            game_message("They are confused", constants.COLOR_RED)
+
+
 #MENUS
 def menu_pause():
     '''
@@ -501,7 +534,7 @@ def menu_pause():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     menu_close = True
-        draw_text(SURFACE_MAIN, menu_text, ((window_width/2) - (text_width/2), (window_height/2) - (text_height/2)), constants.COLOR_WHITE, constants.COLOR_BLACK)
+        draw_text(SURFACE_MAIN, menu_text, ((window_width/2) - (text_width/2), (window_height/2) - (text_height/2)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_BLACK)
         CLOCK.tick(constants.GAME_FPS)
         pygame.display.flip()
 
@@ -546,9 +579,9 @@ def menu_inventory():
             
         for line, (name) in enumerate(print_list):
             if line == int(mouse_line_selection) and mouse_in_window:
-                draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.COLOR_GREY)
+                draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_GREY)
             else:
-                draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.COLOR_BLACK)
+                draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_BLACK)
 
     
         SURFACE_MAIN.blit(local_inventory_surface, (menu_x,menu_y))
@@ -590,6 +623,8 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen
                     return(valid_tiles[-1])
         draw_game()
         for (tile_x, tile_y) in valid_tiles:
+            if (tile_x, tile_y) == valid_tiles[-1]:
+                draw_tile_rect((tile_x, tile_y), mark='X')
             draw_tile_rect((tile_x, tile_y))
         if radius:
             area_effect = map_find_radius(valid_tiles[-1], radius)
@@ -688,7 +723,7 @@ def game_handle_keys():
             if event.key == pygame.K_i:
                 menu_inventory()
             if event.key == pygame.K_l:
-                cast_fireball(10)
+                cast_confusion()
     return "no-action"
 
 def game_message(game_msg, msg_color):

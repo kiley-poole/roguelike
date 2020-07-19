@@ -32,5 +32,6 @@ FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
 MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
 MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
+CURSOR_TEXT = pygame.font.Font("assets/joystix monospace.ttf", CELL_HEIGHT)
 #MESSAGE DEFAULTS
 NUM_MESSAGES = 4
