@@ -27,10 +27,13 @@ class struc_Assets:
         self.S_WALLEXPLORED = self.terrain.get_image('e', 11, 32, 32,constants.COLOR_WHITE)
         self.S_FLOOREXPLORED = self.terrain.get_image('e', 12, 32, 32,constants.COLOR_WHITE)
         
+        ##fix this bullshit - shouldn't need to load as array##
+        self.sword = [pygame.image.load("assets/sword.png")]
+        self.shield = [pygame.image.load("assets/large_shield1.png")]
 
 #OBJECTS
 class obj_Actor:
-    def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None, container = None, item = None):
+    def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None, container = None, item = None, equipment = None):
         self.x = x
         self.y = y
         self.animation = animation
@@ -56,6 +59,23 @@ class obj_Actor:
         if item:
             self.item.owner = self
 
+        self.equipment = equipment
+        if self.equipment:
+            self.equipment.owner = self
+            self.item = com_Item()
+            self.item.owner = self
+    
+    @property
+    def display_name(self):
+        if self.creature:
+            return (self.creature.name + " the " + self.name_object)
+        
+        elif self.item:
+            if self.equipment and self.equipment.equipped:
+                return (self.name_object + " (E)")
+            else:
+                return self.name_object
+    
     def draw(self):
         is_visible = libtcodpy.map_is_in_fov(FOV_MAP, self.x, self.y)
         if is_visible:
@@ -91,7 +111,6 @@ class obj_Actor:
 
         self.creature.move(dx,dy)
         
-
 class obj_Game:
     def __init__(self):
         self.current_map = map_create()
@@ -139,11 +158,13 @@ class obj_Spritesheet:
 class com_Creature:
     '''Creatures have health, can dmg other objects. Can die.'''
 
-    def __init__(self, name_instance, hp = 10, death_function = None):
+    def __init__(self, name_instance, base_atk = 1, base_def = 0, hp = 10, death_function = None):
         self.name = name_instance
         self.maxhp = hp
         self.hp = hp
         self.death_function = death_function
+        self.base_atk = base_atk
+        self.base_def = base_def
 
     def move(self, dx, dy):
 
@@ -152,21 +173,23 @@ class com_Creature:
         target = map_check_for_creatures(self.owner.x + dx, self.owner.y + dy, self.owner)
          
         if target:
-            self.attack(target, 3)
+            self.attack(target)
 
         if not tile_is_wall and target is None:
             self.owner.x += dx
             self.owner.y += dy
 
-    def attack(self, target, damage):
-        game_message((self.name + " attacks " + target.creature.name + " for " + str(damage) + " damage!"), constants.COLOR_WHITE)
-        target.creature.take_damage(damage)
+    def attack(self, target):
+        damage_dealt = self.power - target.creature.defense
+        if damage_dealt < 0: damage_dealt = 0
+        game_message((self.name + " attacks " + target.creature.name + " for " + str(damage_dealt) + " damage!"), constants.COLOR_WHITE)
+        target.creature.take_damage(damage_dealt)
 
     def take_damage(self,damage):
         self.hp -= damage
         if self.hp <= 0:
             self.hp = 0
-        game_message(self.name + "'s health is " + str(self.hp) + "/" + str(self.maxhp), constants.COLOR_RED)
+        game_message(self.owner.display_name + "'s health is " + str(self.hp) + "/" + str(self.maxhp), constants.COLOR_RED)
 
         if self.hp <= 0:
             if self.death_function is not None:
@@ -176,6 +199,32 @@ class com_Creature:
         self.hp += value
         if self.hp > self.maxhp:
             self.hp = self.maxhp
+
+    @property
+    def power(self):
+        total_power = self.base_atk
+
+        if self.owner.container:
+            object_bonuses = [obj.equipment.attack_bonus for obj in self.owner.container.equipped]
+
+            for bonus in object_bonuses:
+                if bonus:
+                    total_power += bonus
+
+        return total_power
+    
+    @property
+    def defense(self):
+        total_defense = self.base_def
+
+        if self.owner.container:
+            object_bonuses = [obj.equipment.defense_bonus for obj in self.owner.container.equipped]
+            for bonus in object_bonuses:
+                if bonus:
+                    total_defense += bonus
+
+        return total_defense
+
 class com_Container:
     def __init__(self, volume = 10.0, inventory = None):
         if inventory is None:
@@ -188,6 +237,36 @@ class com_Container:
     def volume(self):
         return 0.0
     
+    @property
+    def equipped(self):
+        return [obj for obj in self.inventory if obj.equipment and obj.equipment.equipped]   
+
+class com_Equipment:
+
+    def __init__(self, attack_bonus = None, defense_bonus = None, slot = None):
+        self.attack_bonus = attack_bonus
+        self.defense_bonus = defense_bonus
+        self.slot = slot
+        self.equipped = False
+
+    def toggle_equip(self):
+        if self.equipped:
+            self.unequip()
+        else:
+            self.equip()
+    
+    def equip(self):
+        all_equiped_items = self.owner.item.container.equipped
+        for item in all_equiped_items:
+            if item.equipment.slot and (item.equipment.slot == self.slot):
+                game_message("equipment slot is occupied", constants.COLOR_RED)
+                return 
+        self.equipped = True
+        game_message("equipped", constants.COLOR_WHITE)
+    def unequip(self):
+        self.equipped = False
+        game_message("unequipped", constants.COLOR_WHITE)
+
 class com_Item:
     def __init__(self, weight = 0.0, volume = 0.0, use_function = None, value = None):
         self.weight = weight
@@ -216,11 +295,15 @@ class com_Item:
         '''Uses item 
             Currently only consumables        
         '''
+        if self.owner.equipment:
+            self.owner.equipment.toggle_equip()
+            return
+
         if self.use_function:
             result = self.use_function(self.container.owner, self.value)
 
             if result is not None:
-                print("use failed.")
+                game_message("You're at full health. Healing would be pointless.")
             else:
                 self.container.inventory.remove(self.owner)
 #AI
@@ -235,7 +318,7 @@ class ai_Confuse:
             self.num_turns -= 1
         else:
             self.owner.ai = self.old_ai
-            game_message("No longer confused", constants.COLOR_WHITE)
+            game_message(self.owner.display_name + " is no longer confused", constants.COLOR_WHITE)
 
 class ai_Chase:
     '''
@@ -248,7 +331,7 @@ class ai_Chase:
             if monster.distance_to(PLAYER) >= 2:
                 self.owner.move_towards(PLAYER)
             elif PLAYER.creature.hp > 0:
-                monster.creature.attack(PLAYER, 3)
+                monster.creature.attack(PLAYER)
 
 def death_monster(monster):
     '''On death, monster stops'''
@@ -511,7 +594,7 @@ def cast_confusion():
             oldai = target.ai
             target.ai = ai_Confuse(old_ai = oldai, num_turns = 5)
             target.ai.owner = target
-            game_message("They are confused", constants.COLOR_RED)
+            game_message(target.display_name + " is confused", constants.COLOR_RED)
 
 
 #MENUS
@@ -557,7 +640,7 @@ def menu_inventory():
     while not menu_close:
         local_inventory_surface.fill(constants.COLOR_BLACK)
 
-        print_list = [obj.name_object for obj in PLAYER.container.inventory]
+        print_list = [obj.display_name for obj in PLAYER.container.inventory]
 
         events_list = pygame.event.get()
         mouse_x,mouse_y = pygame.mouse.get_pos()
@@ -583,7 +666,7 @@ def menu_inventory():
             else:
                 draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_BLACK)
 
-    
+        draw_game()
         SURFACE_MAIN.blit(local_inventory_surface, (menu_x,menu_y))
         CLOCK.tick(constants.GAME_FPS)
         pygame.display.update()
@@ -676,14 +759,23 @@ def game_init():
 
     item_com1 = com_Item(value = 4, use_function = cast_heal)
     container_com1 = com_Container()
-    creature_com1 = com_Creature("Snake")
-    PLAYER = obj_Actor(1, 1, "Python", ASSETS.A_PLAYER, creature=creature_com1, container=container_com1)
+    creature_com1 = com_Creature("Signz", base_atk = 3)
+    PLAYER = obj_Actor(1, 1, "Player", ASSETS.A_PLAYER, creature=creature_com1, container=container_com1)
 
-    creature_com2 = com_Creature("Crab",  death_function = death_monster)
+    creature_com2 = com_Creature("Jabroni",  death_function = death_monster)
     ai_com = ai_Chase()
-    ENEMY = obj_Actor(12, 12, "Crab", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com, item = item_com1)
+    ENEMY = obj_Actor(12, 12, "AI", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com, item = item_com1)
 
-    GAME.current_objects = [ENEMY, PLAYER]
+    equipment_com1 = com_Equipment(attack_bonus=2)
+    SWORD = obj_Actor(2,2, "short-sword", ASSETS.sword, equipment=equipment_com1)
+
+    equipment_com2 = com_Equipment(defense_bonus=2, slot="Shield")
+    SHIELD = obj_Actor(2,3, "Shield", ASSETS.shield, equipment=equipment_com2)
+
+    equipment_com3 = com_Equipment(defense_bonus=2, slot="Shield")
+    SHIELD2 = obj_Actor(2,4, "Shield", ASSETS.shield, equipment=equipment_com3)
+
+    GAME.current_objects = [ENEMY, PLAYER, SWORD, SHIELD, SHIELD2]
 
 def game_handle_keys():
     global FOV_CALC
