@@ -13,20 +13,28 @@ class struc_Tile:
 class struc_Assets:
     def __init__(self):
         #Sheets
-        self.misc_items = obj_Dawn_Spritesheet("assets/Objects/Decor0.png", "assets/Objects/Decor1.png")
-        self.reptiles_spritesheet = obj_Dawn_Spritesheet("assets/Characters/Reptile0.png", "assets/Characters/Reptile1.png")
-        self.humanoids_spritesheet = obj_Dawn_Spritesheet("assets/Characters/Humanoid0.png","assets/Characters/Humanoid1.png")
-        self.player_spritesheet = obj_Dawn_Spritesheet("assets/Characters/Player0.png","assets/Characters/Player1.png")
-        self.walls_spritesheet = obj_Dawn_Spritesheet("assets/Objects/Wall.png")
-        self.floors_spritesheet = obj_Dawn_Spritesheet("assets/Objects/Floor.png")
-        self.longWep_spritesheet = obj_Dawn_Spritesheet("assets/Items/LongWep.png")
-        self.shield_spritesheet = obj_Dawn_Spritesheet("assets/Items/Shield.png")
-        self.scrolls_spritesheet = obj_Dawn_Spritesheet("assets/Items/Scroll.png")
+        ##Character Sheets
+        self.reptiles_spritesheet = obj_Spritesheet("assets/Characters/Reptile0.png", "assets/Characters/Reptile1.png")
+        self.humanoids_spritesheet = obj_Spritesheet("assets/Characters/Humanoid0.png","assets/Characters/Humanoid1.png")
+        self.player_spritesheet = obj_Spritesheet("assets/Characters/Player0.png","assets/Characters/Player1.png")
+        self.demon_spritesheet = obj_Spritesheet("assets/Characters/Demon0.png","assets/Characters/Demon1.png")
+        self.undead_spritesheet = obj_Spritesheet("assets/Characters/Undead0.png","assets/Characters/Undead1.png")
+        #Object Sheets
+        self.walls_spritesheet = obj_Spritesheet("assets/Objects/Wall.png")
+        self.floors_spritesheet = obj_Spritesheet("assets/Objects/Floor.png")
+        self.misc_items = obj_Spritesheet("assets/Objects/Decor0.png", "assets/Objects/Decor1.png")
+        #Item Sheets
+        self.longWep_spritesheet = obj_Spritesheet("assets/Items/LongWep.png")
+        self.shield_spritesheet = obj_Spritesheet("assets/Items/Shield.png")
+        self.scrolls_spritesheet = obj_Spritesheet("assets/Items/Scroll.png")
 
         #PC/NPCs
         self.dead_monster = self.misc_items.get_animation('a', 12, 2, 16, 16, constants.COLOR_BLACK, (32,32))
         self.A_PLAYER = self.player_spritesheet.get_animation('c', 8, 2, 16, 16, constants.COLOR_BLACK, (32,32))
         self.A_ENEMY = self.humanoids_spritesheet.get_animation('a', 0, 2, 16, 16, constants.COLOR_BLACK, (32,32))
+        self.fire_elemental = self.demon_spritesheet.get_animation('a', 1, 2, 16, 16, constants.COLOR_BLACK, (32,32))
+        self.skeleton = self.undead_spritesheet.get_animation('a', 2, 2, 16, 16, constants.COLOR_BLACK, (32,32))
+        self.skeleton_mage = self.undead_spritesheet.get_animation('h', 2, 2, 16, 16, constants.COLOR_BLACK, (32,32))
 
         #Terrain
         self.S_WALL = self.walls_spritesheet.get_animation('d', 9, 1, 16, 16,constants.COLOR_WHITE, (32,32))
@@ -132,9 +140,12 @@ class obj_Spritesheet:
     Classs used to grab images from Spritesheet.
     '''
 
-    def __init__(self, filename):
-        self.sprite_sheet = pygame.image.load(filename).convert()
-        self.tiledict = {char:index for index, char in enumerate(string.ascii_lowercase, 1)}
+    def __init__(self, filename1, filename2=None):
+        self.sprite_sheet1 = pygame.image.load(filename1).convert()
+        if filename2:
+            self.sprite_sheet2 = pygame.image.load(filename2).convert()
+
+        self.tiledict = {char:index for index, char in enumerate(string.ascii_lowercase, 0)}
     
 
     def get_image(self, column, row, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, color_key = constants.COLOR_BLACK, scale = None):
@@ -149,33 +160,6 @@ class obj_Spritesheet:
         image_list.append(image)
         return image_list
         
-    def get_animation(self, column, row, num_sprites = 1, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, color_key = constants.COLOR_BLACK, scale = None):
-        image_list = []
-
-        for i in range(num_sprites):
-            image = pygame.Surface([width, height]).convert()
-            image.blit(self.sprite_sheet, (0,0), (self.tiledict[column]*width+(width*i), row*height, width, height))
-            image.set_colorkey(color_key)
-
-            if scale:
-                (new_w, new_h) = scale
-                image = pygame.transform.scale(image, (new_w, new_h))
-            image_list.append(image)
-
-        return image_list
-
-class obj_Dawn_Spritesheet:
-    '''
-    Classs used to grab images from Spritesheet.
-    '''
-
-    def __init__(self, filename1, filename2=None):
-        self.sprite_sheet1 = pygame.image.load(filename1).convert()
-        if filename2:
-            self.sprite_sheet2 = pygame.image.load(filename2).convert()
-        self.tiledict = {char:index for index, char in enumerate(string.ascii_lowercase, 0)}
-    ################################
-  
     def get_animation(self, column, row, num_sprites = 1, width = constants.CELL_WIDTH, height = constants.CELL_HEIGHT, color_key = constants.COLOR_BLACK, scale = None):
         image_list = []
 
@@ -197,6 +181,7 @@ class obj_Dawn_Spritesheet:
             image_list.append(image)
 
         return image_list
+
 #COMPONENTS
 class com_Creature:
     '''Creatures have health, can dmg other objects. Can die.'''
@@ -376,6 +361,7 @@ class ai_Chase:
             elif PLAYER.creature.hp > 0:
                 monster.creature.attack(PLAYER)
 
+#DEATH
 def death_monster(monster):
     '''On death, monster stops'''
 
@@ -766,6 +752,14 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen
         CLOCK.tick(constants.GAME_FPS)
 
 #GENERATORS
+def gen_player(coords):
+    x,y = coords
+
+    container_com = com_Container()
+    creature_com = com_Creature("Mingo", base_atk = 3)
+    player = obj_Actor(x, y, "the Maravinchi", ASSETS.A_PLAYER, creature=creature_com, container=container_com)
+    return player
+
 def gen_item(coords):
     random_num = libtcodpy.random_get_int(0,1,5)
 
@@ -837,6 +831,46 @@ def gen_armor_shield(coords):
 
     return return_object
 
+def gen_enemy(coords):
+    random_num = libtcodpy.random_get_int(0,1,100)
+
+    if random_num <= 15: 
+        new_enemy = gen_fire_elemental(coords)
+    elif random_num <= 50 and random_num >15: 
+        new_enemy = gen_skeleton(coords)
+    else: 
+        new_enemy = gen_skeleton_mage(coords)
+
+    GAME.current_objects.append(new_enemy)
+
+
+def gen_fire_elemental(coords):
+    
+    x,y = coords
+
+    creature_name = libtcodpy.namegen_generate("demon male")
+    creature_com = com_Creature(creature_name, base_atk =2 , base_def = 5, hp = 16, death_function = death_monster)
+    ai_com = ai_Chase()
+    fire = obj_Actor(x, y, "fire elemental", ASSETS.fire_elemental, creature=creature_com, ai = ai_com)
+    return fire
+
+def gen_skeleton(coords):
+    x,y = coords
+    creature_name = libtcodpy.namegen_generate("demon male")
+    creature_com = com_Creature(creature_name, base_atk = 1 , base_def = 1, hp = 1, death_function = death_monster)
+    ai_com = ai_Chase()
+    skeleton = obj_Actor(x, y, "skeleton", ASSETS.skeleton, creature=creature_com, ai = ai_com)
+    return skeleton
+
+def gen_skeleton_mage(coords):
+    x,y = coords
+    creature_name = libtcodpy.namegen_generate("demon male")
+    rnd_hp = libtcodpy.random_get_int(0,4,12)
+    creature_com = com_Creature(creature_name,  base_atk = 3 , base_def = 1, hp = rnd_hp, death_function = death_monster)
+    ai_com = ai_Chase()
+    skeleton_mage = obj_Actor(x, y, "skeleton mage", ASSETS.skeleton_mage, creature=creature_com, ai = ai_com)
+    return skeleton_mage
+
 #GAME FUNCTIONS
 def game_main_loop():
     '''Function loops through game logic'''
@@ -875,24 +909,22 @@ def game_init():
 
     ASSETS = struc_Assets()
 
+    libtcodpy.namegen_parse('assets\\namegen\\mingos_demon.cfg')
+
     CLOCK = pygame.time.Clock()
 
-    item_com1 = com_Item(value = 4, use_function = cast_heal)
-    container_com1 = com_Container()
-    creature_com1 = com_Creature("Mingo", base_atk = 3)
-    PLAYER = obj_Actor(1, 1, "the Maravinchi", ASSETS.A_PLAYER, creature=creature_com1, container=container_com1)
-
-    creature_com2 = com_Creature("Pingo",  death_function = death_monster)
-    ai_com = ai_Chase()
-    ENEMY = obj_Actor(12, 12, "the low-energy biddy boi", ASSETS.A_ENEMY, creature=creature_com2, ai = ai_com, item = item_com1)
-
-    GAME.current_objects = [ENEMY, PLAYER]
+    GAME.current_objects = []
 
     gen_item(helper_random_coords())
     gen_item(helper_random_coords())
-    gen_item(helper_random_coords())
+    gen_item(helper_random_coords()) 
 
-    
+    gen_enemy(helper_random_coords())
+    gen_enemy(helper_random_coords())
+
+    PLAYER = gen_player((1,1))
+
+    GAME.current_objects.append(PLAYER)
 
 def game_handle_keys():
     global FOV_CALC
@@ -931,8 +963,6 @@ def game_handle_keys():
                 menu_pause()
             if event.key == pygame.K_i:
                 menu_inventory()
-            if event.key == pygame.K_l:
-                cast_confusion()
     return "no-action"
 
 def game_message(game_msg, msg_color):
