@@ -51,7 +51,8 @@ class struc_Assets:
 
 #OBJECTS
 class obj_Actor:
-    def __init__(self, x, y, name_object, animation, animation_speed = .5, creature = None, ai = None, container = None, item = None, equipment = None):
+    def __init__(self, x, y, name_object, animation, animation_speed = .5, depth = 0, 
+                creature = None, ai = None, container = None, item = None, equipment = None):
         self.x = x
         self.y = y
         self.animation = animation
@@ -60,7 +61,8 @@ class obj_Actor:
         self.flicker = self.animation_speed/len(self.animation) 
         self.flicker_timer = 0.0
         self.sprite_image = 0
-        
+        self.depth = depth
+
         self.creature = creature
         if creature:
             self.creature.owner = self
@@ -98,7 +100,7 @@ class obj_Actor:
         is_visible = libtcodpy.map_is_in_fov(FOV_MAP, self.x, self.y)
         if is_visible:
             if len(self.animation) == 1:
-                SURFACE_MAIN.blit(self.animation[0], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
+                SURFACE_MAP.blit(self.animation[0], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
             else:
                 if CLOCK.get_fps() > 0.0:
                     self.flicker_timer += 1/CLOCK.get_fps()
@@ -108,7 +110,7 @@ class obj_Actor:
                         self.sprite_image = 0
                     else:
                         self.sprite_image += 1
-                SURFACE_MAIN.blit(self.animation[self.sprite_image], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
+                SURFACE_MAP.blit(self.animation[self.sprite_image], ( self.x*constants.CELL_WIDTH, self.y*constants.CELL_HEIGHT))
 
     def distance_to(self, other):
 
@@ -131,7 +133,6 @@ class obj_Actor:
         
 class obj_Game:
     def __init__(self):
-        self.current_map = map_create()
         self.current_objects = []
         self.message_history = []
         
@@ -181,6 +182,46 @@ class obj_Spritesheet:
             image_list.append(image)
 
         return image_list
+
+class obj_Room:
+    '''
+    Rectangle that lives in on the map
+    '''
+    def __init__(self,coords,size):
+        self.x1,self.y1 = coords
+        self.w, self.h = size
+
+        self.x2 = self.x1 +self.w
+        self.y2 = self.y1 + self.h
+        
+    @property
+    def center(self):
+        center_x = (self.x1 + self.x2)//2
+        center_y = (self.y1 + self.y2)//2
+        return (center_x, center_y)
+
+    def intercept(self,other):
+        objects_intersect = (self.x1 <= other.x2 and self.x2 >= other.x1 and self.y1 <= other.y2 and self.y2 >= other.y1)
+        return objects_intersect
+
+class obj_Camera:
+    def __init__(self):
+        
+        self.width = constants.CAM_WIDTH
+        self.height = constants.CAM_HEIGHT
+        self.x, self.y = (0,0)
+
+    def update(self):
+        self.x = PLAYER.x * constants.CELL_WIDTH + (constants.CELL_WIDTH//2)
+        self.y = PLAYER.y * constants.CELL_HEIGHT + (constants.CELL_HEIGHT//2)
+
+    @property
+    def rect(self):
+        pos_rect = pygame.Rect((0,0), (constants.CAM_WIDTH, constants.CAM_HEIGHT))
+
+        pos_rect.center = (self.x, self.y)
+
+        return pos_rect
 
 #COMPONENTS
 class com_Creature:
@@ -369,27 +410,76 @@ def death_monster(monster):
 
 
     monster.animation = ASSETS.dead_monster
+    monster.depth = constants.DEPTH_CORPSE
     monster.creature = None
     monster.ai = None
 
 #MAP FUNCTIONS
 def map_create():
-    new_map = [[ struc_Tile(False) for y in range(0,constants.MAP_WIDTH)] for x in range(0, constants.MAP_HEIGHT)]
+    new_map = [[ struc_Tile(True) for y in range(0,constants.MAP_HEIGHT)] for x in range(0, constants.MAP_WIDTH)]
 
-    new_map[10][10].block_path = True
-    new_map[10][15].block_path = True
+    room_list = []
 
-    for x in range(constants.MAP_WIDTH):
-        new_map[x][0].block_path = True
-        new_map[x][constants.MAP_HEIGHT-1].block_path = True
-    
-    for y in range(constants.MAP_HEIGHT):
-        new_map[0][y].block_path = True
-        new_map[constants.MAP_WIDTH-1][y].block_path = True
+    for i in range(constants.MAP_MAX_NUM_ROOMS):
+        w = libtcodpy.random_get_int(0, constants.ROOM_MIN_WIDTH, constants.ROOM_MAX_WIDTH)
+        h = libtcodpy.random_get_int(0, constants.ROOM_MIN_HEIGHT, constants.ROOM_MAX_HEIGHT)
+        x = libtcodpy.random_get_int(0, 2, constants.MAP_WIDTH - w -2)
+        y = libtcodpy.random_get_int(0, 2, constants.MAP_HEIGHT - h -2)
+        
+        new_room = obj_Room((x,y), (w,h))
+        failed = False
+
+        for other_room in room_list:
+            if new_room.intercept(other_room):
+                failed = True
+                break
+        if not failed:
+            map_create_room(new_map, new_room)
+            center = new_room.center
+
+            if len(room_list) == 0:
+                gen_player(center)
+            else:
+                prev_center = room_list[-1].center
+                map_create_tunnels(center, prev_center, new_map)
+            
+            room_list.append(new_room)
 
     map_make_fov(new_map)
 
-    return new_map
+    return (new_map, room_list)
+
+def map_place_objects(room_list):
+    for room in room_list:
+        x = libtcodpy.random_get_int(0, room.x1+1, room.x2-1)
+        y = libtcodpy.random_get_int(0, room.y1+1, room.y2-1)
+
+        gen_enemy((x,y))
+
+        x = libtcodpy.random_get_int(0, room.x1+1, room.x2-1)
+        y = libtcodpy.random_get_int(0, room.y1+1, room.y2-1)
+
+        gen_item((x,y))
+
+def map_create_room(new_map, new_room):
+    for x in range(new_room.x1, new_room.x2):
+        for y in range(new_room.y1, new_room.y2):
+            new_map[x][y].block_path = False
+
+def map_create_tunnels(coords1, coords2, new_map):
+    coin_flip = (libtcodpy.random_get_int(0,0,1) ==1)
+    x1,y1 = coords1
+    x2,y2 = coords2
+    if coin_flip:
+        for x in range(min(x1, x2), max(x1, x2) + 1):
+            new_map[x][y1].block_path = False
+        for y in range(min(y1, y2), max(y1, y2) + 1):
+            new_map[x2][y].block_path = False
+    else:
+        for y in range(min(y1, y2), max(y1, y2) + 1):
+            new_map[x1][y].block_path = False
+        for x in range(min(x1, x2), max(x1, x2) + 1):
+            new_map[x][y2].block_path = False
 
 def map_check_for_creatures(x, y, exclude_object = None):
     target = None
@@ -478,10 +568,16 @@ def draw_game():
     global SURFACE_MAIN
 
     SURFACE_MAIN.fill(constants.BACKGROUND_COLOR)
-    draw_map(GAME.current_map)
-    for obj in GAME.current_objects:
-        obj.draw()
+    SURFACE_MAP.fill(constants.BACKGROUND_COLOR)
 
+    CAMERA.update()
+
+    disp_rect = pygame.Rect((0,0), (constants.CAM_WIDTH, constants.CAM_HEIGHT))
+
+    draw_map(GAME.current_map)
+    for obj in sorted(GAME.current_objects, key = lambda obj: obj.depth, reverse = True ):
+        obj.draw()
+    SURFACE_MAIN.blit(SURFACE_MAP, (0, 0), CAMERA.rect)
     draw_debug()
     draw_messages()
 
@@ -496,16 +592,16 @@ def draw_map(map_to_draw):
                 map_to_draw[x][y].explored = True
 
                 if map_to_draw[x][y].block_path == True:
-                    SURFACE_MAIN.blit(ASSETS.S_WALL[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAP.blit(ASSETS.S_WALL[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
                 else:
-                    SURFACE_MAIN.blit(ASSETS.S_FLOOR[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAP.blit(ASSETS.S_FLOOR[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
         
             elif map_to_draw[x][y].explored:
                 
                 if map_to_draw[x][y].block_path == True:
-                    SURFACE_MAIN.blit(ASSETS.S_WALLEXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAP.blit(ASSETS.S_WALLEXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
                 else:
-                    SURFACE_MAIN.blit(ASSETS.S_FLOOREXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
+                    SURFACE_MAP.blit(ASSETS.S_FLOOREXPLORED[0], (x*constants.CELL_WIDTH,y*constants.CELL_HEIGHT))
 
 def draw_text(display_surface, text_to_display, T_coords, text_color, font=constants.MENU_FONT, back_color = None, center = False):
     '''This function takes in text and displays it on the referenced surface'''
@@ -529,7 +625,7 @@ def draw_messages():
         to_draw = GAME.message_history[-constants.NUM_MESSAGES:]
 
     text_height = helper_text_size(constants.MESSAGE_FONT)
-    start_y = (constants.MAP_HEIGHT*constants.CELL_HEIGHT - (constants.NUM_MESSAGES * text_height)) - 15
+    start_y = (constants.CAM_HEIGHT - (constants.NUM_MESSAGES * text_height)) - 15
 
     i = 0
     for message, color in to_draw:
@@ -553,7 +649,7 @@ def draw_tile_rect(coords, tile_color = None, tile_alpha = None, mark = None):
 
     if mark:
         draw_text(new_surface, mark, T_coords= (constants.CELL_WIDTH/2, constants.CELL_HEIGHT/2), text_color=constants.COLOR_BLACK, font = constants.CURSOR_TEXT, center=True )
-    SURFACE_MAIN.blit(new_surface, (new_x, new_y))
+    SURFACE_MAP.blit(new_surface, (new_x, new_y))
     
 #HELPER FUNCTIONS
 def helper_text_objects(incoming_text, font, incoming_color, incoming_bg):
@@ -573,6 +669,7 @@ def helper_random_coords():
     ran_x = libtcodpy.random_get_int(0,1,constants.MAP_WIDTH-1)
     ran_y = libtcodpy.random_get_int(0,1,constants.MAP_HEIGHT-1)
     return (ran_x, ran_y)
+
 #MAGIC
 def cast_heal(target, value):
     if target.creature.hp == target.creature.maxhp:
@@ -753,12 +850,12 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen
 
 #GENERATORS
 def gen_player(coords):
+    global PLAYER
     x,y = coords
-
     container_com = com_Container()
     creature_com = com_Creature("Mingo", base_atk = 3)
-    player = obj_Actor(x, y, "the Maravinchi", ASSETS.A_PLAYER, creature=creature_com, container=container_com)
-    return player
+    PLAYER = obj_Actor(x, y, "Maravinchi", ASSETS.A_PLAYER, depth=constants.DEPTH_PLAYER, creature=creature_com, container=container_com)
+    GAME.current_objects.append(PLAYER)
 
 def gen_item(coords):
     random_num = libtcodpy.random_get_int(0,1,5)
@@ -779,7 +876,7 @@ def gen_scroll_lightning(coords):
 
     item_com = com_Item(use_function = cast_lightning, value=(damage, m_range))
 
-    return_object = obj_Actor(x, y, "lightning scroll", ASSETS.lightning_scroll, item = item_com)
+    return_object = obj_Actor(x, y, "lightning scroll", ASSETS.lightning_scroll, depth=constants.DEPTH_ITEM, item = item_com)
 
     return return_object 
 
@@ -792,7 +889,7 @@ def gen_scroll_fireball(coords):
 
     item_com = com_Item(use_function = cast_fireball, value=(damage, radius, m_range))
 
-    return_object = obj_Actor(x, y, "fireball scroll", ASSETS.fireball_scroll, item = item_com)
+    return_object = obj_Actor(x, y, "fireball scroll", ASSETS.fireball_scroll, depth=constants.DEPTH_ITEM, item = item_com)
 
     return return_object 
 
@@ -803,7 +900,7 @@ def gen_scroll_confusion(coords):
 
     item_com = com_Item(use_function = cast_confusion, value=effect_length)
 
-    return_object = obj_Actor(x, y, "confusion scroll", ASSETS.confusion_scroll, item = item_com)
+    return_object = obj_Actor(x, y, "confusion scroll", ASSETS.confusion_scroll, depth=constants.DEPTH_ITEM, item = item_com)
 
     return return_object 
 
@@ -815,7 +912,7 @@ def gen_weapon_sword(coords):
 
     equipment_com = com_Equipment(attack_bonus= bonus)
 
-    return_object = obj_Actor(x,y,"sword", animation = ASSETS.sword, equipment=equipment_com)
+    return_object = obj_Actor(x,y,"sword", animation = ASSETS.sword, depth=constants.DEPTH_ITEM, equipment=equipment_com)
 
     return return_object
 
@@ -827,7 +924,7 @@ def gen_armor_shield(coords):
 
     equipment_com = com_Equipment(defense_bonus = bonus)
 
-    return_object = obj_Actor(x,y,"shield", animation = ASSETS.shield, equipment=equipment_com)
+    return_object = obj_Actor(x,y,"shield", animation = ASSETS.shield, depth=constants.DEPTH_ITEM, equipment=equipment_com)
 
     return return_object
 
@@ -843,15 +940,14 @@ def gen_enemy(coords):
 
     GAME.current_objects.append(new_enemy)
 
-
 def gen_fire_elemental(coords):
     
     x,y = coords
 
     creature_name = libtcodpy.namegen_generate("demon male")
-    creature_com = com_Creature(creature_name, base_atk =2 , base_def = 5, hp = 16, death_function = death_monster)
+    creature_com = com_Creature(creature_name, base_atk = 4 , base_def = 0, hp = 4, death_function = death_monster)
     ai_com = ai_Chase()
-    fire = obj_Actor(x, y, "fire elemental", ASSETS.fire_elemental, creature=creature_com, ai = ai_com)
+    fire = obj_Actor(x, y, "fire elemental", ASSETS.fire_elemental, depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
     return fire
 
 def gen_skeleton(coords):
@@ -859,7 +955,7 @@ def gen_skeleton(coords):
     creature_name = libtcodpy.namegen_generate("demon male")
     creature_com = com_Creature(creature_name, base_atk = 1 , base_def = 1, hp = 1, death_function = death_monster)
     ai_com = ai_Chase()
-    skeleton = obj_Actor(x, y, "skeleton", ASSETS.skeleton, creature=creature_com, ai = ai_com)
+    skeleton = obj_Actor(x, y, "skeleton", ASSETS.skeleton, depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
     return skeleton
 
 def gen_skeleton_mage(coords):
@@ -868,7 +964,7 @@ def gen_skeleton_mage(coords):
     rnd_hp = libtcodpy.random_get_int(0,4,12)
     creature_com = com_Creature(creature_name,  base_atk = 3 , base_def = 1, hp = rnd_hp, death_function = death_monster)
     ai_com = ai_Chase()
-    skeleton_mage = obj_Actor(x, y, "skeleton mage", ASSETS.skeleton_mage, creature=creature_com, ai = ai_com)
+    skeleton_mage = obj_Actor(x, y, "skeleton mage", ASSETS.skeleton_mage, depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
     return skeleton_mage
 
 #GAME FUNCTIONS
@@ -894,37 +990,28 @@ def game_main_loop():
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, GAME, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS
+    global SURFACE_MAIN, SURFACE_MAP, GAME, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA
 
     #init pygame
     pygame.init()
     pygame.key.set_repeat(200,70)
+    libtcodpy.namegen_parse('assets\\namegen\\mingos_demon.cfg')
 
-    SURFACE_MAIN = pygame.display.set_mode( (constants.MAP_WIDTH*constants.CELL_WIDTH, 
-                                             constants.MAP_HEIGHT*constants.CELL_HEIGHT) )
+    SURFACE_MAIN = pygame.display.set_mode((constants.CAM_WIDTH, constants.CAM_HEIGHT))
+    SURFACE_MAP = pygame.Surface((constants.MAP_WIDTH * constants.CELL_WIDTH, constants.MAP_HEIGHT * constants.CELL_HEIGHT))
+    CAMERA = obj_Camera()
+    ASSETS = struc_Assets()
 
     GAME = obj_Game()
 
+    GAME.current_map, GAME.current_rooms = map_create()
+
+    map_place_objects(GAME.current_rooms)
+
     FOV_CALC = True
-
-    ASSETS = struc_Assets()
-
-    libtcodpy.namegen_parse('assets\\namegen\\mingos_demon.cfg')
-
+    
     CLOCK = pygame.time.Clock()
 
-    GAME.current_objects = []
-
-    gen_item(helper_random_coords())
-    gen_item(helper_random_coords())
-    gen_item(helper_random_coords()) 
-
-    gen_enemy(helper_random_coords())
-    gen_enemy(helper_random_coords())
-
-    PLAYER = gen_player((1,1))
-
-    GAME.current_objects.append(PLAYER)
 
 def game_handle_keys():
     global FOV_CALC
