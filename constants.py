@@ -5,7 +5,7 @@ import tcod as libtcodpy
 pygame.init()
 
 #Game defs
-CAM_WIDTH = 800
+CAM_WIDTH = 600
 CAM_HEIGHT = 600
 CELL_WIDTH = 32
 CELL_HEIGHT = 32

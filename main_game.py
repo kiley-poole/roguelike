@@ -135,6 +135,41 @@ class obj_Game:
     def __init__(self):
         self.current_objects = []
         self.message_history = []
+        self.maps_prev = []
+        self.maps_next = []
+        self.current_map, self.current_rooms = map_create()
+    def transition_next(self):
+        global FOV_CALC
+
+        FOV_CALC = True
+        self.maps_prev.append((PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects))
+
+        if len(self.maps_next) == 0:
+            self.current_objects = [PLAYER]
+            self.current_map, self.current_rooms = map_create()
+            map_place_objects(self.current_rooms)
+        else:  
+            (PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects) = self.maps_next[-1]
+
+            map_make_fov(self.current_map)
+
+            FOV_CALC = True
+            
+            del self.maps_next[-1]
+    
+    def transition_prev(self):
+        global FOV_CALC
+
+        if len(self.maps_prev) != 0:
+            self.maps_next.append((PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects))
+
+            (PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects) = self.maps_prev[-1]
+
+            del self.maps_prev[-1]
+
+            map_make_fov(self.current_map)
+
+            FOV_CALC = True
         
 class obj_Spritesheet:
     '''
@@ -212,8 +247,40 @@ class obj_Camera:
         self.x, self.y = (0,0)
 
     def update(self):
-        self.x = PLAYER.x * constants.CELL_WIDTH + (constants.CELL_WIDTH//2)
-        self.y = PLAYER.y * constants.CELL_HEIGHT + (constants.CELL_HEIGHT//2)
+
+        target_x = PLAYER.x * constants.CELL_WIDTH + (constants.CELL_WIDTH//2)
+        target_y = PLAYER.y * constants.CELL_HEIGHT + (constants.CELL_HEIGHT//2)
+
+        distance_x , distance_y =  self.map_distance((target_x,target_y))
+
+        self.x += int(distance_x * .1)
+        self.y += int(distance_y * .1)
+
+    def win_to_map(self, coords):
+        tar_x, tar_y = coords
+
+        cam_d_x, cam_d_y = self.cam_distance((tar_x, tar_y))
+
+        map_p_x = self.x + cam_d_x
+        map_p_y = self.y + cam_d_y
+
+        return((map_p_x, map_p_y))
+
+    def map_distance(self, coords):
+        new_x, new_y = coords
+
+        dist_x = new_x - self.x 
+        dist_y = new_y - self.y
+
+        return (dist_x, dist_y)
+
+    def cam_distance(self, coords):
+        win_x, win_y = coords
+
+        dist_x = win_x - (self.width//2) 
+        dist_y = win_y - (self.height//2)
+
+        return (dist_x, dist_y)
 
     @property
     def rect(self):
@@ -222,6 +289,12 @@ class obj_Camera:
         pos_rect.center = (self.x, self.y)
 
         return pos_rect
+    
+    @property
+    def map_address(self):
+        map_x = self.x // constants.CELL_WIDTH
+        map_y = self.y // constants.CELL_HEIGHT
+        return (map_x,map_y)
 
 #COMPONENTS
 class com_Creature:
@@ -437,9 +510,7 @@ def map_create():
             map_create_room(new_map, new_room)
             center = new_room.center
 
-            if len(room_list) == 0:
-                gen_player(center)
-            else:
+            if len(room_list) != 0:
                 prev_center = room_list[-1].center
                 map_create_tunnels(center, prev_center, new_map)
             
@@ -451,6 +522,9 @@ def map_create():
 
 def map_place_objects(room_list):
     for room in room_list:
+        if room == room_list[0]:
+            PLAYER.x, PLAYER.y = room.center
+
         x = libtcodpy.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcodpy.random_get_int(0, room.y1+1, room.y2-1)
 
@@ -568,13 +642,13 @@ def draw_game():
     global SURFACE_MAIN
 
     SURFACE_MAIN.fill(constants.BACKGROUND_COLOR)
-    SURFACE_MAP.fill(constants.BACKGROUND_COLOR)
-
+    SURFACE_MAP.fill(constants.COLOR_BLACK)
     CAMERA.update()
-
+    draw_map(GAME.current_map)
+    
     disp_rect = pygame.Rect((0,0), (constants.CAM_WIDTH, constants.CAM_HEIGHT))
 
-    draw_map(GAME.current_map)
+
     for obj in sorted(GAME.current_objects, key = lambda obj: obj.depth, reverse = True ):
         obj.draw()
     SURFACE_MAIN.blit(SURFACE_MAP, (0, 0), CAMERA.rect)
@@ -582,8 +656,25 @@ def draw_game():
     draw_messages()
 
 def draw_map(map_to_draw):
-    for x in range(0, constants.MAP_WIDTH):
-        for y in range(0,constants.MAP_HEIGHT):
+
+    cam_x, cam_y = CAMERA.map_address
+    display_map_w = constants.CAM_WIDTH // constants.CELL_WIDTH
+    display_map_h = constants.CAM_HEIGHT // constants.CELL_HEIGHT
+
+    render_w_min = cam_x - (display_map_w//2)
+    render_h_min = cam_y - (display_map_h//2)
+    
+    render_w_max = cam_x + (display_map_w//2)
+    render_h_max = cam_y + (display_map_h//2)
+
+    if render_w_min < 0: render_w_min = 0
+    if render_h_min < 0: render_h_min = 0
+
+    if render_w_max > constants.MAP_WIDTH: render_w_max = constants.MAP_WIDTH
+    if render_h_max > constants.MAP_HEIGHT: render_h_max = constants.MAP_HEIGHT
+
+    for x in range(render_w_min, render_w_max):
+        for y in range(render_h_min, render_h_max):
 
             is_visible = libtcodpy.map_is_in_fov(FOV_MAP, x ,y)
 
@@ -735,8 +826,8 @@ def menu_pause():
     '''
     menu_close = False
 
-    window_width = constants.MAP_WIDTH * constants.CELL_WIDTH
-    window_height = constants.MAP_HEIGHT * constants.CELL_HEIGHT
+    window_width = constants.CAM_WIDTH
+    window_height = constants.CAM_HEIGHT
     menu_text = "PAUSED"
     menu_font = constants.MESSAGE_FONT
     text_height = helper_text_size(menu_font)
@@ -753,15 +844,16 @@ def menu_pause():
         pygame.display.flip()
 
 def menu_inventory():
-    window_width = constants.MAP_WIDTH * constants.CELL_WIDTH
-    window_height = constants.MAP_HEIGHT * constants.CELL_HEIGHT
-
+    
+    window_width = constants.CAM_WIDTH
+    window_height = constants.CAM_HEIGHT
+    
     menu_close = False
 
     menu_height = 200
     menu_width = 200
-    menu_x = int(window_width/2)-int(menu_width/2)
-    menu_y = int(window_height/2)-int(menu_height/2)
+    menu_x = (window_width//2)-(menu_width//2)
+    menu_y = (window_height//2)-(menu_height//2)
 
     menu_text_font = constants.MESSAGE_FONT
     menu_text_height = helper_text_size(menu_text_font)
@@ -780,7 +872,7 @@ def menu_inventory():
         mouse_y_rel = mouse_y - menu_x
 
         mouse_in_window = mouse_x_rel > 0 and mouse_y_rel > 0 and mouse_x_rel < menu_width and mouse_y_rel < menu_height
-        mouse_line_selection = int(mouse_y_rel) / int(menu_text_height)
+        mouse_line_selection = mouse_y_rel//menu_text_height
 
         for event in events_list:
             if event.type == pygame.KEYDOWN:
@@ -793,7 +885,7 @@ def menu_inventory():
                         menu_close = True
             
         for line, (name) in enumerate(print_list):
-            if line == int(mouse_line_selection) and mouse_in_window:
+            if line == mouse_line_selection and mouse_in_window:
                 draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_GREY)
             else:
                 draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_BLACK)
@@ -813,8 +905,11 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen
 
         mouse_x,mouse_y = pygame.mouse.get_pos()
         events_list = pygame.event.get()
-        mouse_x_rel = mouse_x//constants.CELL_WIDTH
-        mouse_y_rel = mouse_y//constants.CELL_HEIGHT
+
+        mapx_pixel, mapy_pixel = CAMERA.win_to_map((mouse_x, mouse_y))
+        mouse_x_rel = mapx_pixel//constants.CELL_WIDTH
+        mouse_y_rel = mapy_pixel//constants.CELL_HEIGHT
+
         valid_tiles=[]
         if coords_origin:
             list_of_tiles = map_find_line(coords_origin, (mouse_x_rel,mouse_y_rel))
@@ -836,7 +931,15 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     return(valid_tiles[-1])
-        draw_game()
+
+        SURFACE_MAIN.fill(constants.BACKGROUND_COLOR)
+        SURFACE_MAP.fill(constants.COLOR_BLACK)
+        CAMERA.update()
+        draw_map(GAME.current_map)
+
+        for obj in sorted(GAME.current_objects, key = lambda obj: obj.depth, reverse = True ):
+            obj.draw()
+
         for (tile_x, tile_y) in valid_tiles:
             if (tile_x, tile_y) == valid_tiles[-1]:
                 draw_tile_rect((tile_x, tile_y), mark='X')
@@ -845,6 +948,10 @@ def menu_target_select(coords_origin = None, range = None, pen_walls = True, pen
             area_effect = map_find_radius(valid_tiles[-1], radius)
             for (rad_x, rad_y) in area_effect:
                     draw_tile_rect((rad_x, rad_y))
+
+        SURFACE_MAIN.blit(SURFACE_MAP, (0, 0), CAMERA.rect)
+        draw_debug()
+        draw_messages()
         pygame.display.flip()
         CLOCK.tick(constants.GAME_FPS)
 
@@ -990,7 +1097,7 @@ def game_main_loop():
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, SURFACE_MAP, GAME, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA
+    global SURFACE_MAIN, SURFACE_MAP, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA
 
     #init pygame
     pygame.init()
@@ -1002,16 +1109,11 @@ def game_init():
     CAMERA = obj_Camera()
     ASSETS = struc_Assets()
 
-    GAME = obj_Game()
-
-    GAME.current_map, GAME.current_rooms = map_create()
-
-    map_place_objects(GAME.current_rooms)
-
     FOV_CALC = True
     
     CLOCK = pygame.time.Clock()
 
+    game_new()
 
 def game_handle_keys():
     global FOV_CALC
@@ -1050,10 +1152,23 @@ def game_handle_keys():
                 menu_pause()
             if event.key == pygame.K_i:
                 menu_inventory()
+            if event.key == pygame.K_l:
+                GAME.transition_next()
+            if event.key == pygame.K_o:
+                GAME.transition_prev()
     return "no-action"
 
 def game_message(game_msg, msg_color):
     GAME.message_history.append((game_msg, msg_color))
+
+def game_new():
+    global GAME
+
+    GAME = obj_Game()
+
+    gen_player((0,0))
+
+    map_place_objects(GAME.current_rooms)
 
 if __name__ == '__main__':
     game_init()
