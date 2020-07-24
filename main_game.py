@@ -3,6 +3,8 @@ import tcod as libtcodpy
 import constants
 import string
 import math
+import _pickle as pickle
+import gzip
 
 #STRUCTS
 class struc_Tile:
@@ -19,10 +21,13 @@ class struc_Assets:
         self.player_spritesheet = obj_Spritesheet("assets/Characters/Player0.png","assets/Characters/Player1.png")
         self.demon_spritesheet = obj_Spritesheet("assets/Characters/Demon0.png","assets/Characters/Demon1.png")
         self.undead_spritesheet = obj_Spritesheet("assets/Characters/Undead0.png","assets/Characters/Undead1.png")
+        self.elemental_spritesheet = obj_Spritesheet("assets/Characters/Elemental0.png","assets/Characters/Elemental1.png")
         #Object Sheets
         self.walls_spritesheet = obj_Spritesheet("assets/Objects/Wall.png")
         self.floors_spritesheet = obj_Spritesheet("assets/Objects/Floor.png")
+        self.stairs_spritesheet = obj_Spritesheet("assets/Objects/Tile.png")
         self.misc_items = obj_Spritesheet("assets/Objects/Decor0.png", "assets/Objects/Decor1.png")
+        self.effects_spritesheet = obj_Spritesheet("assets/Objects/Effect0.png", "assets/Objects/Effect1.png")
         #Item Sheets
         self.longWep_spritesheet = obj_Spritesheet("assets/Items/LongWep.png")
         self.shield_spritesheet = obj_Spritesheet("assets/Items/Shield.png")
@@ -35,12 +40,15 @@ class struc_Assets:
         self.fire_elemental = self.demon_spritesheet.get_animation('a', 1, 2, 16, 16, constants.COLOR_BLACK, (32,32))
         self.skeleton = self.undead_spritesheet.get_animation('a', 2, 2, 16, 16, constants.COLOR_BLACK, (32,32))
         self.skeleton_mage = self.undead_spritesheet.get_animation('h', 2, 2, 16, 16, constants.COLOR_BLACK, (32,32))
+        self.healing_sprite = self.elemental_spritesheet.get_animation('a', 10, 2, 16, 16, constants.COLOR_BLACK, (32,32))
 
         #Terrain
         self.S_WALL = self.walls_spritesheet.get_animation('d', 9, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         self.S_FLOOR = self.floors_spritesheet.get_animation('i', 16, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         self.S_WALLEXPLORED = self.walls_spritesheet.get_animation('d', 12, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         self.S_FLOOREXPLORED = self.floors_spritesheet.get_animation('i', 22, 1, 16, 16,constants.COLOR_WHITE, (32,32))
+        self.S_UPSTAIRS = self.stairs_spritesheet.get_animation('e', 1, 1, 16, 16,constants.COLOR_WHITE, (32,32))
+        self.S_DOWNSTAIRS = self.stairs_spritesheet.get_animation('f', 1, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         
         #Items
         self.sword = self.longWep_spritesheet.get_animation('a', 1, 1, 16, 16,constants.COLOR_BLACK, (32,32))
@@ -48,14 +56,34 @@ class struc_Assets:
         self.lightning_scroll = self.scrolls_spritesheet.get_animation('a', 0, 1, 16, 16,constants.COLOR_BLACK, (32,32))
         self.fireball_scroll = self.scrolls_spritesheet.get_animation('c', 2, 1, 16, 16,constants.COLOR_BLACK, (32,32))
         self.confusion_scroll = self.scrolls_spritesheet.get_animation('d', 5, 1, 16, 16,constants.COLOR_BLACK, (32,32))
+        self.healing_drop = self.effects_spritesheet.get_animation('h', 23, 2, 16, 16,constants.COLOR_BLACK, (32,32))
 
+        self.animation_dict = {
+            "dead_monster": self.dead_monster,
+            "A_PLAYER": self.A_PLAYER,
+            "A_ENEMY": self.A_ENEMY,
+            "fire_elemental": self.fire_elemental,
+            "skeleton": self.skeleton,
+            "skeleton_mage": self.skeleton_mage,
+            "sword": self.sword,
+            "shield": self.shield,
+            "lightning_scroll": self.lightning_scroll,
+            "fireball_scroll": self.fireball_scroll,
+            "confusion_scroll": self.confusion_scroll,
+            "S_UPSTAIRS": self.S_UPSTAIRS,
+            "S_DOWNSTAIRS": self.S_DOWNSTAIRS,
+            "healing_drop": self.healing_drop,
+            "healing_sprite": self.healing_sprite
+        }
+        
 #OBJECTS
 class obj_Actor:
-    def __init__(self, x, y, name_object, animation, animation_speed = .5, depth = 0, 
-                creature = None, ai = None, container = None, item = None, equipment = None):
+    def __init__(self, x, y, name_object, animation_key, animation_speed = .5, depth = 0, 
+                creature = None, ai = None, container = None, item = None, equipment = None, stairs = None):
         self.x = x
         self.y = y
-        self.animation = animation
+        self.animation_key = animation_key
+        self.animation = ASSETS.animation_dict[self.animation_key]
         self.name_object = name_object
         self.animation_speed = animation_speed / 1.0
         self.flicker = self.animation_speed/len(self.animation) 
@@ -84,7 +112,11 @@ class obj_Actor:
             self.equipment.owner = self
             self.item = com_Item()
             self.item.owner = self
-    
+            
+        self.stairs = stairs
+        if self.stairs:
+            self.stairs.owner = self
+
     @property
     def display_name(self):
         if self.creature:
@@ -130,7 +162,24 @@ class obj_Actor:
         dy = int(round(dy/distance))
 
         self.creature.move(dx,dy)
-        
+
+    def move_away(self,other):
+
+        dx = self.x - other.x 
+        dy = self.y - other.y 
+
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+
+        dx = int(round(dx/distance))
+        dy = int(round(dy/distance))
+
+        self.creature.move(dx,dy)
+    def animation_destroy(self):
+        self.animation = None    
+    
+    def animation_init(self):
+        self.animation = ASSETS.animation_dict[self.animation_key]
+
 class obj_Game:
     def __init__(self):
         self.current_objects = []
@@ -143,13 +192,18 @@ class obj_Game:
 
         FOV_CALC = True
         self.maps_prev.append((PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects))
-
+        for obj in self.current_objects:
+            obj.animation_destroy()
         if len(self.maps_next) == 0:
             self.current_objects = [PLAYER]
+            PLAYER.animation_init()
             self.current_map, self.current_rooms = map_create()
             map_place_objects(self.current_rooms)
         else:  
             (PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects) = self.maps_next[-1]
+            
+            for obj in self.current_objects:
+                obj.animation_init()
 
             map_make_fov(self.current_map)
 
@@ -161,16 +215,21 @@ class obj_Game:
         global FOV_CALC
 
         if len(self.maps_prev) != 0:
+            for obj in self.current_objects:
+                obj.animation_destroy()
             self.maps_next.append((PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects))
 
             (PLAYER.x, PLAYER.y, self.current_map, self.current_rooms, self.current_objects) = self.maps_prev[-1]
 
-            del self.maps_prev[-1]
+            for obj in self.current_objects:
+                obj.animation_init()
 
             map_make_fov(self.current_map)
 
             FOV_CALC = True
         
+            del self.maps_prev[-1]
+
 class obj_Spritesheet:
     '''
     Classs used to grab images from Spritesheet.
@@ -423,11 +482,13 @@ class com_Item:
             else:
                 game_message(self.owner.display_name + " Picked Up", constants.COLOR_WHITE)
                 actor.container.inventory.append(self.owner)
+                self.owner.animation_destroy()
                 GAME.current_objects.remove(self.owner)
                 self.container = actor.container
     
     def drop(self, pos_x, pos_y):
         GAME.current_objects.append(self.owner)
+        self.owner.animation_init()
         self.container.inventory.remove(self.owner)
         self.owner.x = pos_x
         self.owner.y = pos_y
@@ -448,6 +509,16 @@ class com_Item:
                 game_message("You're at full health. Healing would be pointless.", constants.COLOR_RED)
             else:
                 self.container.inventory.remove(self.owner)
+
+class com_Stairs:
+    def __init__(self, downwards = True):
+        self.downwards = downwards
+    
+    def use(self):
+        if self.downwards:
+            GAME.transition_next()
+        else:
+            GAME.transition_prev()
 #AI
 class ai_Confuse:
     '''Once per turn execute'''
@@ -475,15 +546,31 @@ class ai_Chase:
             elif PLAYER.creature.hp > 0:
                 monster.creature.attack(PLAYER)
 
+class ai_Flee:
+    '''
+    A basic monster ai which chases and harms player
+    '''
+
+    def take_turn(self):
+        monster = self.owner
+        if libtcodpy.map_is_in_fov(FOV_MAP, monster.x, monster.y):
+            self.owner.move_away(PLAYER)
 #DEATH
 def death_monster(monster):
     '''On death, monster stops'''
-
     game_message((monster.creature.name + " is dead!"), constants.COLOR_GREY)
-
-
     monster.animation = ASSETS.dead_monster
+    monster.animation_key = "dead_monster"
     monster.depth = constants.DEPTH_CORPSE
+    monster.creature = None
+    monster.ai = None
+
+def death_healing_sprite(monster):
+    '''On death, monster stops'''
+    game_message((monster.creature.name + " is dead! Gather his essence to heal!"), constants.COLOR_GREEN)
+    monster.animation = ASSETS.healing_drop
+    monster.animation_key = "healing_drop"
+    monster.depth = constants.DEPTH_ITEM
     monster.creature = None
     monster.ai = None
 
@@ -521,9 +608,16 @@ def map_create():
     return (new_map, room_list)
 
 def map_place_objects(room_list):
+    top_level = (len(GAME.maps_prev) ==0)
     for room in room_list:
-        if room == room_list[0]:
-            PLAYER.x, PLAYER.y = room.center
+        first_room = (room == room_list[0])
+        last_room = (room == room_list[-1])
+        if first_room: PLAYER.x, PLAYER.y = room.center
+            
+        
+        if first_room and not top_level: gen_stairs((PLAYER.x, PLAYER.y), downwards=False)
+
+        if last_room: gen_stairs(room.center)
 
         x = libtcodpy.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcodpy.random_get_int(0, room.y1+1, room.y2-1)
@@ -961,7 +1055,7 @@ def gen_player(coords):
     x,y = coords
     container_com = com_Container()
     creature_com = com_Creature("Mingo", base_atk = 3)
-    PLAYER = obj_Actor(x, y, "Maravinchi", ASSETS.A_PLAYER, depth=constants.DEPTH_PLAYER, creature=creature_com, container=container_com)
+    PLAYER = obj_Actor(x, y, "Maravinchi", animation_key= "A_PLAYER", depth=constants.DEPTH_PLAYER, creature=creature_com, container=container_com)
     GAME.current_objects.append(PLAYER)
 
 def gen_item(coords):
@@ -983,7 +1077,7 @@ def gen_scroll_lightning(coords):
 
     item_com = com_Item(use_function = cast_lightning, value=(damage, m_range))
 
-    return_object = obj_Actor(x, y, "lightning scroll", ASSETS.lightning_scroll, depth=constants.DEPTH_ITEM, item = item_com)
+    return_object = obj_Actor(x, y, "lightning scroll", animation_key= "lightning_scroll", depth=constants.DEPTH_ITEM, item = item_com)
 
     return return_object 
 
@@ -996,7 +1090,7 @@ def gen_scroll_fireball(coords):
 
     item_com = com_Item(use_function = cast_fireball, value=(damage, radius, m_range))
 
-    return_object = obj_Actor(x, y, "fireball scroll", ASSETS.fireball_scroll, depth=constants.DEPTH_ITEM, item = item_com)
+    return_object = obj_Actor(x, y, "fireball scroll", animation_key= "fireball_scroll", depth=constants.DEPTH_ITEM, item = item_com)
 
     return return_object 
 
@@ -1007,7 +1101,7 @@ def gen_scroll_confusion(coords):
 
     item_com = com_Item(use_function = cast_confusion, value=effect_length)
 
-    return_object = obj_Actor(x, y, "confusion scroll", ASSETS.confusion_scroll, depth=constants.DEPTH_ITEM, item = item_com)
+    return_object = obj_Actor(x, y, "confusion scroll", animation_key= "confusion_scroll", depth=constants.DEPTH_ITEM, item = item_com)
 
     return return_object 
 
@@ -1019,7 +1113,7 @@ def gen_weapon_sword(coords):
 
     equipment_com = com_Equipment(attack_bonus= bonus)
 
-    return_object = obj_Actor(x,y,"sword", animation = ASSETS.sword, depth=constants.DEPTH_ITEM, equipment=equipment_com)
+    return_object = obj_Actor(x,y,"sword", animation_key= "sword", depth=constants.DEPTH_ITEM, equipment=equipment_com)
 
     return return_object
 
@@ -1031,7 +1125,7 @@ def gen_armor_shield(coords):
 
     equipment_com = com_Equipment(defense_bonus = bonus)
 
-    return_object = obj_Actor(x,y,"shield", animation = ASSETS.shield, depth=constants.DEPTH_ITEM, equipment=equipment_com)
+    return_object = obj_Actor(x,y,"shield", animation_key= "shield", depth=constants.DEPTH_ITEM, equipment=equipment_com)
 
     return return_object
 
@@ -1039,11 +1133,13 @@ def gen_enemy(coords):
     random_num = libtcodpy.random_get_int(0,1,100)
 
     if random_num <= 15: 
-        new_enemy = gen_fire_elemental(coords)
-    elif random_num <= 50 and random_num >15: 
-        new_enemy = gen_skeleton(coords)
-    else: 
         new_enemy = gen_skeleton_mage(coords)
+    elif random_num <= 50: 
+        new_enemy = gen_skeleton(coords)
+    elif random_num <= 80:
+        new_enemy = gen_fire_elemental(coords)
+    else: 
+        new_enemy = gen_healing_sprite(coords)
 
     GAME.current_objects.append(new_enemy)
 
@@ -1054,7 +1150,7 @@ def gen_fire_elemental(coords):
     creature_name = libtcodpy.namegen_generate("demon male")
     creature_com = com_Creature(creature_name, base_atk = 4 , base_def = 0, hp = 4, death_function = death_monster)
     ai_com = ai_Chase()
-    fire = obj_Actor(x, y, "fire elemental", ASSETS.fire_elemental, depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
+    fire = obj_Actor(x, y, "fire elemental", animation_key= "fire_elemental", depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
     return fire
 
 def gen_skeleton(coords):
@@ -1062,7 +1158,7 @@ def gen_skeleton(coords):
     creature_name = libtcodpy.namegen_generate("demon male")
     creature_com = com_Creature(creature_name, base_atk = 1 , base_def = 1, hp = 1, death_function = death_monster)
     ai_com = ai_Chase()
-    skeleton = obj_Actor(x, y, "skeleton", ASSETS.skeleton, depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
+    skeleton = obj_Actor(x, y, "skeleton", animation_key= "skeleton", depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
     return skeleton
 
 def gen_skeleton_mage(coords):
@@ -1071,9 +1167,30 @@ def gen_skeleton_mage(coords):
     rnd_hp = libtcodpy.random_get_int(0,4,12)
     creature_com = com_Creature(creature_name,  base_atk = 3 , base_def = 1, hp = rnd_hp, death_function = death_monster)
     ai_com = ai_Chase()
-    skeleton_mage = obj_Actor(x, y, "skeleton mage", ASSETS.skeleton_mage, depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
+    skeleton_mage = obj_Actor(x, y, "skeleton mage", animation_key= "skeleton_mage", depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com)
     return skeleton_mage
 
+def gen_healing_sprite(coords):
+    x,y = coords
+    creature_name = libtcodpy.namegen_generate("demon female")
+    creature_com = com_Creature(creature_name,  base_atk = 0 , base_def = 0, hp = 1, death_function = death_healing_sprite)
+    ai_com = ai_Flee()
+    item_com = com_Item(use_function=cast_heal, value=2)
+    healing_sprite = obj_Actor(x, y, "healing sprite", animation_key= "healing_sprite", depth=constants.DEPTH_CREATURE, creature=creature_com, ai = ai_com, item=item_com)
+    return healing_sprite
+
+def gen_stairs(coords, downwards = True):
+    x, y = coords
+
+    if downwards:
+        stairs_com = com_Stairs()
+        stairs = obj_Actor(x, y, "stairs", animation_key = "S_DOWNSTAIRS", stairs = stairs_com)
+    else:
+        stairs_com = com_Stairs(downwards)
+        stairs = obj_Actor(x, y, "stairs", animation_key = "S_UPSTAIRS", stairs = stairs_com)
+
+    GAME.current_objects.append(stairs)
+    
 #GAME FUNCTIONS
 def game_main_loop():
     '''Function loops through game logic'''
@@ -1084,7 +1201,7 @@ def game_main_loop():
         player_action = game_handle_keys()
         map_calc_fov()
         if player_action == "QUIT":
-            game_quit = True
+            game_exit()
         elif player_action != "no-action":
             for obj in GAME.current_objects:
                 if obj.ai:
@@ -1092,7 +1209,6 @@ def game_main_loop():
         draw_game()
         pygame.display.flip()
         CLOCK.tick(constants.GAME_FPS)
-    pygame.quit()
 
 def game_init():
     '''Function inits the game window and pygame'''
@@ -1112,12 +1228,16 @@ def game_init():
     FOV_CALC = True
     
     CLOCK = pygame.time.Clock()
-
-    game_new()
+    try:
+        game_load()
+    except:
+        game_new()
 
 def game_handle_keys():
     global FOV_CALC
+    keys_list = pygame.key.get_pressed()
     events_list = pygame.event.get()
+    MOD_KEY = keys_list[pygame.K_RSHIFT] or keys_list[pygame.K_LSHIFT]
     for event in events_list:
         if event.type == pygame.QUIT:
             return "QUIT"
@@ -1152,10 +1272,12 @@ def game_handle_keys():
                 menu_pause()
             if event.key == pygame.K_i:
                 menu_inventory()
-            if event.key == pygame.K_l:
-                GAME.transition_next()
-            if event.key == pygame.K_o:
-                GAME.transition_prev()
+            if MOD_KEY and event.key == pygame.K_PERIOD:
+                list_of_objs = map_objects_at_coords(PLAYER.x, PLAYER.y)
+                for obj in list_of_objs:
+                    if obj.stairs:
+                        obj.stairs.use()
+            
     return "no-action"
 
 def game_message(game_msg, msg_color):
@@ -1169,6 +1291,27 @@ def game_new():
     gen_player((0,0))
 
     map_place_objects(GAME.current_rooms)
+
+def game_exit():
+    game_save()
+    pygame.quit()
+    exit()
+
+def game_save():
+    for obj in GAME.current_objects:
+        obj.animation_destroy()
+
+    with gzip.open('data\savedata\savegame', 'wb') as file:
+        pickle.dump([GAME, PLAYER],file)
+
+def game_load():
+
+    global GAME, PLAYER
+    with gzip.open('data\savedata\savegame', 'rb') as file:
+        GAME, PLAYER = pickle.load(file)
+    for obj in GAME.current_objects:
+        obj.animation_init()
+    map_make_fov(GAME.current_map)
 
 if __name__ == '__main__':
     game_init()
