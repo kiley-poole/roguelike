@@ -913,7 +913,79 @@ def cast_confusion(caster, effect_length):
             target.ai.owner = target
             game_message(target.display_name + " is confused", constants.COLOR_RED)
 
+#USER INTERFACE
+class ui_Button:
+    def __init__(self, surface, button_text, size, center_coords, 
+                color_box_mouseover = constants.COLOR_RED, 
+                color_box_default = constants.COLOR_GREEN, 
+                color_text_mouseover = constants.COLOR_WHITE, 
+                color_text_default = constants.COLOR_WHITE):
+        
+        self.surface = surface
+        self.text = button_text
+        self.size = size
+        self.center_coords = center_coords
+        self.c_box_mo = color_box_mouseover
+        self.c_box_def = color_box_default
+        self.c_text_mo = color_text_mouseover
+        self.c_text_def = color_text_default
+        self.current_c_box = color_box_default
+        self.current_c_text = color_text_default
+
+        self.rect = pygame.Rect((0,0), size)
+        self.rect.center = center_coords
+    def update(self, player_input):
+        local_events, local_mouse_pos = player_input
+        mouse_x, mouse_y = local_mouse_pos
+        mouse_clicked = False
+        mouse_over = (mouse_x > self.rect.left 
+                    and mouse_x <= self.rect.right
+                    and mouse_y >= self.rect.top
+                    and mouse_y <= self.rect.bottom)
+        for event in local_events:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mouse_clicked = True
+        
+        if mouse_over and mouse_clicked:
+            return True
+        
+        if mouse_over:
+            self.current_c_box = self.c_box_mo
+            self.current_c_text = self.c_text_mo
+        else:
+            self.current_c_box = self.c_box_def
+            self.current_c_text = self.c_text_def
+        
+    def draw(self):
+        pygame.draw.rect(self.surface, self.current_c_box, self.rect)
+        draw_text(self.surface, self.text, self.center_coords, self.current_c_text, center=True)
+
 #MENUS
+def menu_main():
+    game_init()
+    menu_running = True
+    title_y =  constants.CAM_HEIGHT//2 - 40
+    title_x = constants.CAM_WIDTH//2
+    title_text = "Mingo's House of Horrors"
+    test_button = ui_Button(SURFACE_MAIN, "Start Game!", (150,35), (title_x,title_y + 20)) 
+    while menu_running:
+        list_of_events = pygame.event.get()
+        mouse_pos = pygame.mouse.get_pos()
+
+        game_input = (list_of_events, mouse_pos)
+
+        for event in list_of_events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+        if test_button.update(game_input):
+            game_start()
+        SURFACE_MAIN.fill(constants.COLOR_BLACK)
+        draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, center=True)
+        test_button.draw()
+        pygame.display.update()
+
 def menu_pause():
     '''
     Pauses Game and displays menu
@@ -1228,10 +1300,7 @@ def game_init():
     FOV_CALC = True
     
     CLOCK = pygame.time.Clock()
-    try:
-        game_load()
-    except:
-        game_new()
+
 
 def game_handle_keys():
     global FOV_CALC
@@ -1313,6 +1382,14 @@ def game_load():
         obj.animation_init()
     map_make_fov(GAME.current_map)
 
-if __name__ == '__main__':
-    game_init()
+def game_start():
+    try:
+        game_load()
+    except:
+        game_new()
+    
     game_main_loop()
+
+if __name__ == '__main__':
+    menu_main()        
+    
