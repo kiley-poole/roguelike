@@ -5,7 +5,7 @@ import tcod as libtcodpy
 pygame.init()
 
 #Game defs
-CAM_WIDTH = 600
+CAM_WIDTH = 800
 CAM_HEIGHT = 600
 CELL_WIDTH = 32
 CELL_HEIGHT = 32
@@ -39,6 +39,7 @@ BACKGROUND_COLOR = COLOR_GREY
 FOV_ALGO = libtcodpy.FOV_BASIC
 FOV_LIGHT_WALLS = True
 TORCH_RADIUS = 10
+MAIN_MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 40)
 MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
 MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
 CURSOR_TEXT = pygame.font.Font("assets/joystix monospace.ttf", CELL_HEIGHT)

@@ -15,6 +15,8 @@ class struc_Tile:
 
 class struc_Assets:
     def __init__(self):
+
+
         #Sheets
         ##Character Sheets
         self.reptiles_spritesheet = obj_Spritesheet("assets/Characters/Reptile0.png", "assets/Characters/Reptile1.png")
@@ -51,6 +53,16 @@ class struc_Assets:
         self.S_UPSTAIRS = self.stairs_spritesheet.get_animation('e', 1, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         self.S_DOWNSTAIRS = self.stairs_spritesheet.get_animation('f', 1, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         
+        #UI
+        self.MAIN_MENU_BG = pygame.image.load("assets/main_menu.jpg")
+        self.MAIN_MENU_BG = pygame.transform.scale(self.MAIN_MENU_BG, (constants.CAM_WIDTH, constants.CAM_HEIGHT))
+        self.settings_menu_bg = pygame.image.load("assets/UI/red_panel.png")
+        self.settings_menu_bg = pygame.transform.scale(self.settings_menu_bg, (200,200))
+        self.sfx_slider_bg = pygame.image.load("assets/UI/grey_button06.png")
+        self.sfx_slider_bg = pygame.transform.scale(self.sfx_slider_bg, (125,15))
+        self.sfx_slider_tab = pygame.image.load("assets/UI/green_button12.png")
+        self.sfx_slider_tab = pygame.transform.scale(self.sfx_slider_tab, (20,20))
+
         #Items
         self.sword = self.longWep_spritesheet.get_animation('a', 1, 1, 16, 16,constants.COLOR_BLACK, (32,32))
         self.shield = self.shield_spritesheet.get_animation('c', 0, 1, 16, 16,constants.COLOR_BLACK, (32,32))
@@ -77,15 +89,17 @@ class struc_Assets:
             "healing_sprite": self.healing_sprite
         }
 
+        self.snd_list = []
+
         self.music_bg = "assets/audio/music/lost-control.mp3"
-        self.hit_1 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt.wav")
-        self.hit_2 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt2.wav")
-        self.hit_3 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt3.wav")
-        self.hit_4 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt4.wav")
-        self.hit_5 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt5.wav")
-        self.hit_6 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt6.wav")
-        self.hit_7 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt7.wav")
-        self.hit_8 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt8.wav")
+        self.hit_1 = self.add_sound("assets/audio/sfx/hit_hurt.wav")
+        self.hit_2 = self.add_sound("assets/audio/sfx/hit_hurt2.wav")
+        self.hit_3 = self.add_sound("assets/audio/sfx/hit_hurt3.wav")
+        self.hit_4 = self.add_sound("assets/audio/sfx/hit_hurt4.wav")
+        self.hit_5 = self.add_sound("assets/audio/sfx/hit_hurt5.wav")
+        self.hit_6 = self.add_sound("assets/audio/sfx/hit_hurt6.wav")
+        self.hit_7 = self.add_sound("assets/audio/sfx/hit_hurt7.wav")
+        self.hit_8 = self.add_sound("assets/audio/sfx/hit_hurt8.wav")
 
         self.sfx_list_hit = [
             self.hit_1,
@@ -97,6 +111,14 @@ class struc_Assets:
             self.hit_7, 
             self.hit_8 
         ]
+
+    def add_sound(self, file_address):
+
+        new_sound = pygame.mixer.Sound("assets/audio/sfx/hit_hurt.wav")
+        
+        self.snd_list.append(new_sound)
+
+        return new_sound
         
 #OBJECTS
 class obj_Actor:
@@ -943,8 +965,8 @@ def cast_confusion(caster, effect_length):
 #USER INTERFACE
 class ui_Button:
     def __init__(self, surface, button_text, size, center_coords, 
-                color_box_mouseover = constants.COLOR_RED, 
-                color_box_default = constants.COLOR_GREEN, 
+                color_box_mouseover = constants.COLOR_GREY, 
+                color_box_default = constants.COLOR_BLACK, 
                 color_text_mouseover = constants.COLOR_WHITE, 
                 color_text_default = constants.COLOR_WHITE):
         
@@ -987,6 +1009,52 @@ class ui_Button:
     def draw(self):
         pygame.draw.rect(self.surface, self.current_c_box, self.rect)
         draw_text(self.surface, self.text, self.center_coords, self.current_c_text, center=True)
+class ui_Slider:
+    def __init__(self, surface, size, center_coords, bg_color, fg_color, parameter_value):
+        
+        self.surface = surface
+        self.size = size
+        self.center_coords = center_coords
+        self.bg_color = bg_color
+        self.fg_color = fg_color
+        self.current_val = parameter_value
+
+        self.bg_rect = pygame.Rect((0,0), size)
+        self.bg_rect.center = center_coords
+        self.fg_rect = pygame.Rect((0,0), (self.bg_rect.width * self.current_val, self.bg_rect.height))
+        self.fg_rect.topleft = self.bg_rect.topleft 
+        
+        self.grip_tab = pygame.Rect((0,0), (20,self.bg_rect.height+4))
+        self.grip_tab.center = (self.fg_rect.right, self.bg_rect.centery)
+    def update(self, player_input):
+
+        mouse_down = pygame.mouse.get_pressed()[0]
+
+        local_events, local_mouse_pos = player_input
+        mouse_x, mouse_y = local_mouse_pos
+
+        mouse_over = (mouse_x > self.bg_rect.left 
+                    and mouse_x <= self.bg_rect.right
+                    and mouse_y >= self.bg_rect.top
+                    and mouse_y <= self.bg_rect.bottom)
+        
+        if mouse_down and mouse_over:
+            self.current_val = (mouse_x - self.bg_rect.left)/self.bg_rect.width 
+
+            print(mouse_x - self.bg_rect.left)
+            self.fg_rect.width = self.bg_rect.width * self.current_val
+            self.grip_tab.center = (self.fg_rect.right, self.bg_rect.centery)
+
+    def draw(self):
+        #draw bg
+        pygame.draw.rect(self.surface, self.bg_color, self.bg_rect)
+        SURFACE_MAIN.blit(ASSETS.sfx_slider_bg, self.bg_rect.topleft)
+        #draw fg
+        pygame.draw.rect(self.surface, self.fg_color, self.fg_rect)
+        #draw tab
+        pygame.draw.rect(self.surface, constants.COLOR_GREY , self.grip_tab)
+        SURFACE_MAIN.blit(ASSETS.sfx_slider_tab, self.grip_tab.topleft)
+        
 
 #MENUS
 def menu_main():
@@ -994,13 +1062,29 @@ def menu_main():
     game_init()
 
     menu_running = True
+
     title_y =  constants.CAM_HEIGHT//2 - 40
     title_x = constants.CAM_WIDTH//2
-    title_text = "Mingo's House of Horrors"
-    SURFACE_MAIN.fill(constants.COLOR_BLACK)
-    draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, center=True)
-    test_button = ui_Button(SURFACE_MAIN, "Start Game!", (150,35), (title_x,title_y + 20)) 
+    title_text = "Mingo's House of Horrors" 
 
+    #Button Loctaions
+    continue_button_y = title_y + 40
+    start_button_y = continue_button_y + 40
+    options_button_y = start_button_y + 40
+    quit_button_y = options_button_y + 40
+
+    #Draw Menu
+    SURFACE_MAIN.blit(ASSETS.MAIN_MENU_BG, (0,0))
+    draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, font=constants.MAIN_MENU_FONT, back_color=constants.COLOR_BLACK, center=True)
+    
+    #Buttons 
+    continue_button = ui_Button(SURFACE_MAIN, "Continue", (150,35), (title_x,continue_button_y)) 
+    start_button = ui_Button(SURFACE_MAIN, "New Game", (150,35), (title_x,start_button_y)) 
+    options_button = ui_Button(SURFACE_MAIN, "Options", (150,35), (title_x,options_button_y)) 
+    quit_button = ui_Button(SURFACE_MAIN, "Quit", (100,35), (title_x,quit_button_y)) 
+
+
+    #Main Menu Music
     pygame.mixer.music.load(ASSETS.music_bg)
     pygame.mixer.music.play(-1)
 
@@ -1014,11 +1098,79 @@ def menu_main():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 exit()
-        if test_button.update(game_input):
+        if continue_button.update(game_input):
             pygame.mixer.music.stop()
-            game_start()
+            try:
+                game_load()
+            except:
+                game_new()
+            
+            game_main_loop()
 
-        test_button.draw()
+        if  start_button.update(game_input):
+            pygame.mixer.music.stop()
+            game_new()
+            game_main_loop()
+
+
+        if  options_button.update(game_input):
+            pygame.mixer.music.stop()
+            menu_options()
+            SURFACE_MAIN.blit(ASSETS.MAIN_MENU_BG, (0,0))
+            draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, font=constants.MAIN_MENU_FONT, back_color=constants.COLOR_BLACK, center=True)
+
+            
+        if  quit_button.update(game_input):
+            pygame.mixer.music.stop()
+            pygame.quit()
+            exit()
+
+        start_button.draw()
+        continue_button.draw()
+        options_button.draw()
+        quit_button.draw()
+
+        pygame.display.update()
+
+def menu_options():
+    settings_menu_width = 200
+    settings_menu_height = 200
+    settings_menu_bgcolor = constants.COLOR_BLACK
+
+    sfx_slider_x = constants.CAM_WIDTH//2
+    sfx_slider_y = constants.CAM_HEIGHT//2
+    sfx_volume = .5
+
+    window_center = (constants.CAM_WIDTH//2 , constants.CAM_HEIGHT//2)
+
+    settings_menu_surface = pygame.Surface((settings_menu_width, settings_menu_height))
+    settings_menu_rect = pygame.Rect(0,0, settings_menu_width, settings_menu_height)
+    settings_menu_rect.center = window_center
+
+    menu_close = False
+    
+    sound_sfx_slider = ui_Slider(SURFACE_MAIN, (125,15), (sfx_slider_x, sfx_slider_y), constants.COLOR_GREY, constants.COLOR_GREEN, .5)
+
+    while not menu_close:
+        
+        list_of_events = pygame.event.get()
+        mouse_pos = pygame.mouse.get_pos()
+
+        game_input = (list_of_events, mouse_pos)
+
+        for event in list_of_events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    menu_close = True
+        
+        sound_sfx_slider.update(game_input)
+        SURFACE_MAIN.blit(ASSETS.settings_menu_bg, settings_menu_rect.topleft)
+        sound_sfx_slider.draw() 
+
         pygame.display.update()
 
 def menu_pause():
@@ -1416,14 +1568,6 @@ def game_load():
     for obj in GAME.current_objects:
         obj.animation_init()
     map_make_fov(GAME.current_map)
-
-def game_start():
-    try:
-        game_load()
-    except:
-        game_new()
-    
-    game_main_loop()
 
 if __name__ == '__main__':
     menu_main()        
