@@ -5,6 +5,7 @@ import string
 import math
 import _pickle as pickle
 import gzip
+import random
 
 #STRUCTS
 class struc_Tile:
@@ -75,6 +76,27 @@ class struc_Assets:
             "healing_drop": self.healing_drop,
             "healing_sprite": self.healing_sprite
         }
+
+        self.music_bg = "assets/audio/music/lost-control.mp3"
+        self.hit_1 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt.wav")
+        self.hit_2 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt2.wav")
+        self.hit_3 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt3.wav")
+        self.hit_4 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt4.wav")
+        self.hit_5 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt5.wav")
+        self.hit_6 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt6.wav")
+        self.hit_7 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt7.wav")
+        self.hit_8 = pygame.mixer.Sound("assets/audio/sfx/hit_hurt8.wav")
+
+        self.sfx_list_hit = [
+            self.hit_1,
+            self.hit_2,
+            self.hit_3, 
+            self.hit_4, 
+            self.hit_5, 
+            self.hit_6, 
+            self.hit_7, 
+            self.hit_8 
+        ]
         
 #OBJECTS
 class obj_Actor:
@@ -385,6 +407,11 @@ class com_Creature:
         if damage_dealt < 0: damage_dealt = 0
         game_message((self.name + " attacks " + target.creature.name + " for " + str(damage_dealt) + " damage!"), constants.COLOR_WHITE)
         target.creature.take_damage(damage_dealt)
+
+        if damage_dealt > 0 and self.owner is PLAYER:
+            pygame.mixer.Sound.play(RANDOM_ENGINE.choice(ASSETS.sfx_list_hit))
+
+
 
     def take_damage(self,damage):
         self.hp -= damage
@@ -963,12 +990,20 @@ class ui_Button:
 
 #MENUS
 def menu_main():
+
     game_init()
+
     menu_running = True
     title_y =  constants.CAM_HEIGHT//2 - 40
     title_x = constants.CAM_WIDTH//2
     title_text = "Mingo's House of Horrors"
+    SURFACE_MAIN.fill(constants.COLOR_BLACK)
+    draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, center=True)
     test_button = ui_Button(SURFACE_MAIN, "Start Game!", (150,35), (title_x,title_y + 20)) 
+
+    pygame.mixer.music.load(ASSETS.music_bg)
+    pygame.mixer.music.play(-1)
+
     while menu_running:
         list_of_events = pygame.event.get()
         mouse_pos = pygame.mouse.get_pos()
@@ -980,9 +1015,9 @@ def menu_main():
                 pygame.quit()
                 exit()
         if test_button.update(game_input):
+            pygame.mixer.music.stop()
             game_start()
-        SURFACE_MAIN.fill(constants.COLOR_BLACK)
-        draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, center=True)
+
         test_button.draw()
         pygame.display.update()
 
@@ -1285,7 +1320,7 @@ def game_main_loop():
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, SURFACE_MAP, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA
+    global SURFACE_MAIN, SURFACE_MAP, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA, RANDOM_ENGINE
 
     #init pygame
     pygame.init()
@@ -1296,7 +1331,7 @@ def game_init():
     SURFACE_MAP = pygame.Surface((constants.MAP_WIDTH * constants.CELL_WIDTH, constants.MAP_HEIGHT * constants.CELL_HEIGHT))
     CAMERA = obj_Camera()
     ASSETS = struc_Assets()
-
+    RANDOM_ENGINE = random.SystemRandom()
     FOV_CALC = True
     
     CLOCK = pygame.time.Clock()
