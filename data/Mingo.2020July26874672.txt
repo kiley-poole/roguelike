@@ -1,0 +1,14 @@
+Nixechir'el attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 7/10
+Mingo attacks Nixechir'el for 2 damage!
+Nixechir'el the skeleton mage's health is 7/9
+Nixechir'el attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 4/10
+Mingo attacks Nixechir'el for 2 damage!
+Nixechir'el the skeleton mage's health is 5/9
+Nixechir'el attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 1/10
+Mingo attacks Nixechir'el for 2 damage!
+Nixechir'el the skeleton mage's health is 3/9
+Nixechir'el attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 0/10

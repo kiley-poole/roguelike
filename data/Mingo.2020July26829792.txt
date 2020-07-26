@@ -1,0 +1,14 @@
+Aamides attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 6/10
+Mingo attacks Aamides for 3 damage!
+Aamides the fire elemental's health is 1/4
+Aamides attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 2/10
+Mingo attacks Aamides for 3 damage!
+Aamides the fire elemental's health is 0/4
+Aamides is dead!
+lightning scroll Picked Up
+Djammut attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 1/10
+Djammut attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 0/10

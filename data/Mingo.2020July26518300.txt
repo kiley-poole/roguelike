@@ -1,0 +1,38 @@
+Mingo attacks Vualidea for 3 damage!
+Vualidea the healing sprite's health is 0/1
+Vualidea is dead! Gather his essence to heal!
+healing sprite Picked Up
+Mingo attacks Zimakor for 2 damage!
+Zimakor the skeleton mage's health is 3/5
+Zimakor attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 7/10
+Mingo attacks Zimakor for 2 damage!
+Zimakor the skeleton mage's health is 1/5
+Zimakor attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 4/10
+Mingo attacks Zimakor for 2 damage!
+Zimakor the skeleton mage's health is 0/5
+Zimakor is dead!
+Mingo attacks Ithussaksha for 3 damage!
+Ithussaksha the healing sprite's health is 0/1
+Ithussaksha is dead! Gather his essence to heal!
+healing sprite Picked Up
+confusion scroll Picked Up
+sword Picked Up
+Mingo the Maravinchi healed for 2 HP!
+Current HP is 6/10
+Mingo the Maravinchi healed for 2 HP!
+Current HP is 8/10
+Xaphenex the fire elemental is confused
+equipped
+Xaphenex attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 4/10
+Xaphenex the fire elemental is no longer confused
+Mingo attacks Balbergon for 3 damage!
+Balbergon the skeleton mage's health is 8/11
+Balbergon attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 1/10
+Mingo attacks Balbergon for 3 damage!
+Balbergon the skeleton mage's health is 5/11
+Balbergon attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 0/10

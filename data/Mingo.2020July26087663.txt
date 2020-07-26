@@ -1,0 +1,11 @@
+Mingo attacks Sthidumath for 3 damage!
+Sthidumath the fire elemental's health is 1/4
+Sthidumath attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 6/10
+Mingo attacks Sthidumath for 3 damage!
+Sthidumath the fire elemental's health is 0/4
+Sthidumath is dead!
+Azubus attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 2/10
+Azubus attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 0/10

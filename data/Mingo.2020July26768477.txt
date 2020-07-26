@@ -1,0 +1,12 @@
+Tsabomath attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 6/10
+Mingo attacks Tsabomath for 3 damage!
+Tsabomath the fire elemental's health is 1/4
+Tsabomath attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 2/10
+Mingo attacks Tsabomath for 3 damage!
+Tsabomath the fire elemental's health is 0/4
+Tsabomath is dead!
+lightning scroll Picked Up
+Balbavart attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 0/10

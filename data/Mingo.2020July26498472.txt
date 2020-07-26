@@ -1,0 +1,27 @@
+Mingo attacks Aperiax for 2 damage!
+Aperiax the skeleton's health is 0/1
+Aperiax is dead!
+Berethra attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 9/10
+Mingo attacks Berethra for 2 damage!
+Berethra the skeleton's health is 0/1
+Berethra is dead!
+Graphemoth attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 8/10
+Graphemoth attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 7/10
+Graphemoth attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 6/10
+Graphemoth attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 5/10
+Graphemoth attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 4/10
+Graphemoth attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 3/10
+Mingo attacks Graphemoth for 2 damage!
+Graphemoth the skeleton's health is 0/1
+Graphemoth is dead!
+Mingo attacks Semigotzirus for 3 damage!
+Semigotzirus the fire elemental's health is 1/4
+Semigotzirus attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 0/10

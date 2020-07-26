@@ -1,0 +1,37 @@
+Mingo attacks Seeracess for 20 damage!
+Seeracess the healing sprite's health is 0/1
+Seeracess is dead! Gather his essence to heal!
+healing sprite Picked Up
+fireball scroll Picked Up
+Liothethe attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Liothethe attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Mingo attacks Liothethe for 19 damage!
+Liothethe the skeleton's health is 0/1
+Liothethe is dead!
+Lilembamath attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Mingo attacks Lilembamath for 20 damage!
+Lilembamath the fire elemental's health is 0/4
+Lilembamath is dead!
+Berolaas attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Berolaas attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Beralianias attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Mingo attacks Beralianias for 19 damage!
+Beralianias the skeleton's health is 0/1
+Beralianias is dead!
+Mingo attacks Zimanar for 20 damage!
+Zimanar the fire elemental's health is 0/4
+Zimanar is dead!
+Mingo attacks Malin'ennin for 19 damage!
+Malin'ennin the skeleton's health is 0/1
+Malin'ennin is dead!
+DIAMOND Picked Up
+Berolaas attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10
+Berolaas attacks Mingo for 0 damage!
+Mingo the Maravinchi's health is 10/10

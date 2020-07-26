@@ -5,19 +5,20 @@ import tcod as libtcodpy
 pygame.init()
 
 #Game defs
-CAM_WIDTH = 800
-CAM_HEIGHT = 600
+CAM_WIDTH = 800 
+CAM_HEIGHT = 800
 CELL_WIDTH = 32
 CELL_HEIGHT = 32
 
 #MAP VARS
-MAP_WIDTH = 125
-MAP_HEIGHT = 125
-MAP_MAX_NUM_ROOMS = 65
+MAP_WIDTH = 20
+MAP_HEIGHT = 20
+MAP_MAX_NUM_ROOMS = 5
+MAP_LEVELS = 3
 
 #ROOM VARS
-ROOM_MAX_HEIGHT = 8
-ROOM_MAX_WIDTH = 7
+ROOM_MAX_HEIGHT = 5
+ROOM_MAX_WIDTH = 5
 ROOM_MIN_HEIGHT = 3
 ROOM_MIN_WIDTH = 3
 
@@ -43,6 +44,9 @@ MAIN_MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 40)
 MENU_FONT = pygame.font.Font("assets/joystix monospace.ttf", 16)
 MESSAGE_FONT = pygame.font.Font("assets/joystix monospace.ttf", 12)
 CURSOR_TEXT = pygame.font.Font("assets/joystix monospace.ttf", CELL_HEIGHT)
+OPTIONS_FONT = pygame.font.Font("assets/kenvector_future.ttf", 16)
+
+
 #MESSAGE DEFAULTS
 NUM_MESSAGES = 4
 

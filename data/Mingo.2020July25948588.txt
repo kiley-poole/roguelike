@@ -1,0 +1,17 @@
+Xaphubus attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 9/10
+Mingo attacks Xaphubus for 2 damage!
+Xaphubus the skeleton's health is 0/1
+Xaphubus is dead!
+Draghuraal attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 5/10
+Mingo attacks Draghuraal for 3 damage!
+Draghuraal the fire elemental's health is 1/4
+Draghuraal attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 1/10
+Mingo attacks Draghuraal for 3 damage!
+Draghuraal the fire elemental's health is 0/4
+Draghuraal is dead!
+lightning scroll Picked Up
+Al-A'wir'el attacks Mingo for 1 damage!
+Mingo the Maravinchi's health is 0/10

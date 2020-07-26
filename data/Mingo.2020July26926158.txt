@@ -1,0 +1,8 @@
+Mingo attacks Abor'el for 3 damage!
+Abor'el the fire elemental's health is 1/4
+Abor'el attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 6/10
+Abor'el attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 2/10
+Abor'el attacks Mingo for 4 damage!
+Mingo the Maravinchi's health is 0/10

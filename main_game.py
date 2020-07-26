@@ -6,17 +6,26 @@ import math
 import _pickle as pickle
 import gzip
 import random
-
+import datetime
+import os
 #STRUCTS
 class struc_Tile:
     def __init__(self, block_path):
         self.block_path = block_path
         self.explored = False
 
-class struc_Assets:
+class struc_Prefs:
     def __init__(self):
+        self.vol_sound = .5
+        self.vol_music = .25
 
+#OBJECTS
+class obj_Assets:
+    def __init__(self):
+        self.load_assets()
+        self.adjust_sound()
 
+    def load_assets(self):
         #Sheets
         ##Character Sheets
         self.reptiles_spritesheet = obj_Spritesheet("assets/Characters/Reptile0.png", "assets/Characters/Reptile1.png")
@@ -29,12 +38,14 @@ class struc_Assets:
         self.walls_spritesheet = obj_Spritesheet("assets/Objects/Wall.png")
         self.floors_spritesheet = obj_Spritesheet("assets/Objects/Floor.png")
         self.stairs_spritesheet = obj_Spritesheet("assets/Objects/Tile.png")
+        self.doors_spritesheet = obj_Spritesheet("assets/Objects/Door0.png", "assets/Objects/Door1.png")
         self.misc_items = obj_Spritesheet("assets/Objects/Decor0.png", "assets/Objects/Decor1.png")
         self.effects_spritesheet = obj_Spritesheet("assets/Objects/Effect0.png", "assets/Objects/Effect1.png")
         #Item Sheets
         self.longWep_spritesheet = obj_Spritesheet("assets/Items/LongWep.png")
         self.shield_spritesheet = obj_Spritesheet("assets/Items/Shield.png")
         self.scrolls_spritesheet = obj_Spritesheet("assets/Items/Scroll.png")
+        self.treasure_spritesheet = obj_Spritesheet("assets/Items/Money.png")
 
         #PC/NPCs
         self.dead_monster = self.misc_items.get_animation('a', 12, 2, 16, 16, constants.COLOR_BLACK, (32,32))
@@ -52,6 +63,8 @@ class struc_Assets:
         self.S_FLOOREXPLORED = self.floors_spritesheet.get_animation('i', 22, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         self.S_UPSTAIRS = self.stairs_spritesheet.get_animation('e', 1, 1, 16, 16,constants.COLOR_WHITE, (32,32))
         self.S_DOWNSTAIRS = self.stairs_spritesheet.get_animation('f', 1, 1, 16, 16,constants.COLOR_WHITE, (32,32))
+        self.S_PORTAL_OPEN = self.doors_spritesheet.get_animation('f', 5, 2, 16, 16,constants.COLOR_BLACK, (32,32))
+        self.S_PORTAL_CLOSED = self.doors_spritesheet.get_animation('e', 5, 2, 16, 16,constants.COLOR_BLACK, (32,32))
         
         #UI
         self.MAIN_MENU_BG = pygame.image.load("assets/main_menu.jpg")
@@ -70,6 +83,7 @@ class struc_Assets:
         self.fireball_scroll = self.scrolls_spritesheet.get_animation('c', 2, 1, 16, 16,constants.COLOR_BLACK, (32,32))
         self.confusion_scroll = self.scrolls_spritesheet.get_animation('d', 5, 1, 16, 16,constants.COLOR_BLACK, (32,32))
         self.healing_drop = self.effects_spritesheet.get_animation('h', 23, 2, 16, 16,constants.COLOR_BLACK, (32,32))
+        self.diamond = self.treasure_spritesheet.get_animation('b', 2, 1, 16, 16,constants.COLOR_BLACK, (32,32))
 
         self.animation_dict = {
             "dead_monster": self.dead_monster,
@@ -85,8 +99,11 @@ class struc_Assets:
             "confusion_scroll": self.confusion_scroll,
             "S_UPSTAIRS": self.S_UPSTAIRS,
             "S_DOWNSTAIRS": self.S_DOWNSTAIRS,
+            "S_PORTAL_OPEN": self.S_PORTAL_OPEN,
+            "S_PORTAL_CLOSED": self.S_PORTAL_CLOSED,
             "healing_drop": self.healing_drop,
-            "healing_sprite": self.healing_sprite
+            "healing_sprite": self.healing_sprite,
+            "diamond": self.diamond
         }
 
         self.snd_list = []
@@ -119,11 +136,15 @@ class struc_Assets:
         self.snd_list.append(new_sound)
 
         return new_sound
+    
+    def adjust_sound(self):
+        for sound in self.snd_list:
+            sound.set_volume(PREFS.vol_sound)
+        pygame.mixer.music.set_volume(PREFS.vol_music)
         
-#OBJECTS
 class obj_Actor:
-    def __init__(self, x, y, name_object, animation_key, animation_speed = .5, depth = 0, 
-                creature = None, ai = None, container = None, item = None, equipment = None, stairs = None):
+    def __init__(self, x, y, name_object, animation_key, animation_speed = .5, depth = 0, state = None,
+                creature = None, ai = None, container = None, item = None, equipment = None, stairs = None, exitportal = None):
         self.x = x
         self.y = y
         self.animation_key = animation_key
@@ -134,6 +155,7 @@ class obj_Actor:
         self.flicker_timer = 0.0
         self.sprite_image = 0
         self.depth = depth
+        self.state = state
 
         self.creature = creature
         if creature:
@@ -160,6 +182,10 @@ class obj_Actor:
         self.stairs = stairs
         if self.stairs:
             self.stairs.owner = self
+
+        self.exitportal = exitportal
+        if self.exitportal:
+            self.exitportal.owner = self
 
     @property
     def display_name(self):
@@ -568,6 +594,55 @@ class com_Stairs:
             GAME.transition_next()
         else:
             GAME.transition_prev()
+
+class com_Portal:
+    def __init__(self):
+        self.open_animation = "S_PORTAL_OPEN"
+        self.closed_animation = "S_PORTAL_CLOSED"
+    
+    def update(self):
+
+        found_lamp = False
+
+        portal_open = self.owner.state == "OPEN"
+
+        for obj in PLAYER.container.inventory:
+            if obj.name_object == "DIAMOND":
+                found_lamp = True
+        
+        if found_lamp and not portal_open:
+            self.owner.state = "OPEN"
+            self.owner.animation_key = "S_PORTAL_OPEN"
+            self.owner.animation_init()
+        
+        if not found_lamp and portal_open:
+            self.owner.state = "CLOSED"
+            self.owner.animation_key = "S_PORTAL_CLOSED"
+            self.owner.animation_init()
+
+    def use(self):
+        if self.owner.state == "OPEN":
+            PLAYER.state = "STATUS_WIN"
+
+            SURFACE_MAIN.fill(constants.COLOR_WHITE)
+
+            draw_text(SURFACE_MAIN, "YOU WON!", (constants.CAM_WIDTH//2, constants.CAM_HEIGHT//2 ), constants.COLOR_BLACK,font=constants.MAIN_MENU_FONT, center=True)
+            pygame.display.update()
+
+            file_name =   "data\\win_"+PLAYER.creature.name + "." + datetime.datetime.now().strftime("%Y%B%d%f") + ".txt"
+
+            if os.path.isFile("data\\savedate\\savegame"):
+                os.remove("data\\savedate\\savegame")
+
+            legacy_file = open(file_name, 'a+')
+            legacy_file.write("WINNING GAME SHITHEAD!\n" )
+            for message,color in GAME.message_history:
+                legacy_file.write(message + "\n")
+
+            pygame.time.wait(2000)
+   
+                
+
 #AI
 class ai_Confuse:
     '''Once per turn execute'''
@@ -623,6 +698,21 @@ def death_healing_sprite(monster):
     monster.creature = None
     monster.ai = None
 
+def death_player(player):
+    player.state = "DEAD"
+
+    SURFACE_MAIN.fill(constants.COLOR_BLACK)
+
+    draw_text(SURFACE_MAIN, "YOU DEAD!", (constants.CAM_WIDTH//2, constants.CAM_HEIGHT//2 ), constants.COLOR_WHITE,font=constants.MAIN_MENU_FONT, center=True)
+    pygame.display.update()
+
+    file_name =   "data\\"+PLAYER.creature.name + "." + datetime.datetime.now().strftime("%Y%B%d%f") + ".txt"
+    legacy_file = open(file_name, 'a+')
+    for message,color in GAME.message_history:
+        legacy_file.write(message + "\n")
+
+    pygame.time.wait(2000)
+
 #MAP FUNCTIONS
 def map_create():
     new_map = [[ struc_Tile(True) for y in range(0,constants.MAP_HEIGHT)] for x in range(0, constants.MAP_WIDTH)]
@@ -657,16 +747,27 @@ def map_create():
     return (new_map, room_list)
 
 def map_place_objects(room_list):
-    top_level = (len(GAME.maps_prev) ==0)
+    cur_level = len(GAME.maps_prev) + 1
+    top_level = (cur_level == 1)
+    final_level = (cur_level == constants.MAP_LEVELS)
     for room in room_list:
         first_room = (room == room_list[0])
         last_room = (room == room_list[-1])
-        if first_room: PLAYER.x, PLAYER.y = room.center
-            
-        
-        if first_room and not top_level: gen_stairs((PLAYER.x, PLAYER.y), downwards=False)
 
-        if last_room: gen_stairs(room.center)
+        if first_room: PLAYER.x, PLAYER.y = room.center    
+        
+        if first_room and top_level:
+            gen_portal(room.center)
+
+        if first_room and not top_level:
+             gen_stairs((PLAYER.x, PLAYER.y), downwards=False)
+
+        if last_room:
+            if final_level: 
+                gen_lamp(room.center)
+            else:
+                gen_stairs(room.center)
+
 
         x = libtcodpy.random_get_int(0, room.x1+1, room.x2-1)
         y = libtcodpy.random_get_int(0, room.y1+1, room.y2-1)
@@ -1009,6 +1110,7 @@ class ui_Button:
     def draw(self):
         pygame.draw.rect(self.surface, self.current_c_box, self.rect)
         draw_text(self.surface, self.text, self.center_coords, self.current_c_text, center=True)
+
 class ui_Slider:
     def __init__(self, surface, size, center_coords, bg_color, fg_color, parameter_value):
         
@@ -1041,7 +1143,6 @@ class ui_Slider:
         if mouse_down and mouse_over:
             self.current_val = (mouse_x - self.bg_rect.left)/self.bg_rect.width 
 
-            print(mouse_x - self.bg_rect.left)
             self.fg_rect.width = self.bg_rect.width * self.current_val
             self.grip_tab.center = (self.fg_rect.right, self.bg_rect.centery)
 
@@ -1055,7 +1156,6 @@ class ui_Slider:
         pygame.draw.rect(self.surface, constants.COLOR_GREY , self.grip_tab)
         SURFACE_MAIN.blit(ASSETS.sfx_slider_tab, self.grip_tab.topleft)
         
-
 #MENUS
 def menu_main():
 
@@ -1073,10 +1173,6 @@ def menu_main():
     options_button_y = start_button_y + 40
     quit_button_y = options_button_y + 40
 
-    #Draw Menu
-    SURFACE_MAIN.blit(ASSETS.MAIN_MENU_BG, (0,0))
-    draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, font=constants.MAIN_MENU_FONT, back_color=constants.COLOR_BLACK, center=True)
-    
     #Buttons 
     continue_button = ui_Button(SURFACE_MAIN, "Continue", (150,35), (title_x,continue_button_y)) 
     start_button = ui_Button(SURFACE_MAIN, "New Game", (150,35), (title_x,start_button_y)) 
@@ -1111,20 +1207,20 @@ def menu_main():
             pygame.mixer.music.stop()
             game_new()
             game_main_loop()
-
+            game_init()
 
         if  options_button.update(game_input):
-            pygame.mixer.music.stop()
             menu_options()
-            SURFACE_MAIN.blit(ASSETS.MAIN_MENU_BG, (0,0))
-            draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, font=constants.MAIN_MENU_FONT, back_color=constants.COLOR_BLACK, center=True)
-
             
         if  quit_button.update(game_input):
             pygame.mixer.music.stop()
             pygame.quit()
             exit()
-
+        
+        #Draw Menu
+        SURFACE_MAIN.blit(ASSETS.MAIN_MENU_BG, (0,0))
+        draw_text(SURFACE_MAIN, title_text, (title_x, title_y-200), constants.COLOR_WHITE, font=constants.MAIN_MENU_FONT, back_color=constants.COLOR_BLACK, center=True)
+    
         start_button.draw()
         continue_button.draw()
         options_button.draw()
@@ -1138,7 +1234,7 @@ def menu_options():
     settings_menu_bgcolor = constants.COLOR_BLACK
 
     sfx_slider_x = constants.CAM_WIDTH//2
-    sfx_slider_y = constants.CAM_HEIGHT//2
+    sfx_slider_y = constants.CAM_HEIGHT//2 - 50
     sfx_volume = .5
 
     window_center = (constants.CAM_WIDTH//2 , constants.CAM_HEIGHT//2)
@@ -1149,7 +1245,11 @@ def menu_options():
 
     menu_close = False
     
-    sound_sfx_slider = ui_Slider(SURFACE_MAIN, (125,15), (sfx_slider_x, sfx_slider_y), constants.COLOR_GREY, constants.COLOR_GREEN, .5)
+    sound_sfx_slider = ui_Slider(SURFACE_MAIN, (125,15), (sfx_slider_x, sfx_slider_y), constants.COLOR_GREY, constants.COLOR_GREEN, PREFS.vol_sound)
+
+    music_sfx_slider = ui_Slider(SURFACE_MAIN, (125,15), (sfx_slider_x, sfx_slider_y + 50), constants.COLOR_GREY, constants.COLOR_GREEN, PREFS.vol_music)
+
+    save_button = ui_Button(SURFACE_MAIN, "SAVE", (100,50), (sfx_slider_x, sfx_slider_y +100),)
 
     while not menu_close:
         
@@ -1166,10 +1266,31 @@ def menu_options():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     menu_close = True
+
+        cur_sound_vol = PREFS.vol_sound
+        cur_music_vol = PREFS.vol_music
+
+        if cur_sound_vol is not sound_sfx_slider.current_val:
+            PREFS.vol_sound = sound_sfx_slider.current_val
+            ASSETS.adjust_sound()
         
+        if cur_music_vol is not music_sfx_slider.current_val:
+            PREFS.vol_music = music_sfx_slider.current_val
+            ASSETS.adjust_sound()
+
+        if save_button.update(game_input):
+            prefs_save()
+            menu_close = True
+
         sound_sfx_slider.update(game_input)
+        music_sfx_slider.update(game_input)
         SURFACE_MAIN.blit(ASSETS.settings_menu_bg, settings_menu_rect.topleft)
+        draw_text(SURFACE_MAIN, "SFX Volume", (sfx_slider_x, sfx_slider_y - 20), constants.COLOR_WHITE, font=constants.OPTIONS_FONT, center=True)
+        draw_text(SURFACE_MAIN, "Music Volume", (sfx_slider_x, sfx_slider_y + 30), constants.COLOR_WHITE, font=constants.OPTIONS_FONT, center=True)
+
         sound_sfx_slider.draw() 
+        music_sfx_slider.draw() 
+        save_button.draw() 
 
         pygame.display.update()
 
@@ -1236,7 +1357,10 @@ def menu_inventory():
                     if (int(mouse_in_window) and int(mouse_line_selection) <= int(len(print_list)) -1):
                         PLAYER.container.inventory[int(mouse_line_selection)].item.use()
                         menu_close = True
-            
+                if event.button == 3:
+                    if (int(mouse_in_window) and int(mouse_line_selection) <= int(len(print_list)) -1):
+                        PLAYER.container.inventory[int(mouse_line_selection)].item.drop(PLAYER.x, PLAYER.y)
+                        menu_close = True
         for line, (name) in enumerate(print_list):
             if line == mouse_line_selection and mouse_in_window:
                 draw_text(local_inventory_surface, name, (0, 0 + (line * menu_text_height)), constants.COLOR_WHITE, constants.MENU_FONT, constants.COLOR_GREY)
@@ -1313,7 +1437,7 @@ def gen_player(coords):
     global PLAYER
     x,y = coords
     container_com = com_Container()
-    creature_com = com_Creature("Mingo", base_atk = 3)
+    creature_com = com_Creature("Mingo", base_atk = 20, base_def=20, death_function=death_player)
     PLAYER = obj_Actor(x, y, "Maravinchi", animation_key= "A_PLAYER", depth=constants.DEPTH_PLAYER, creature=creature_com, container=container_com)
     GAME.current_objects.append(PLAYER)
 
@@ -1449,7 +1573,21 @@ def gen_stairs(coords, downwards = True):
         stairs = obj_Actor(x, y, "stairs", animation_key = "S_UPSTAIRS", stairs = stairs_com)
 
     GAME.current_objects.append(stairs)
-    
+
+def gen_portal(coords):
+    x,y = coords
+
+    port_com = com_Portal()
+    portal = obj_Actor(x,y, "exit port", animation_key="S_PORTAL_CLOSED", depth= constants.DEPTH_CORPSE, exitportal=port_com)
+
+    GAME.current_objects.append(portal)
+
+def gen_lamp(coords):
+    x, y = coords
+
+    item_com = com_Item()
+    return_object = obj_Actor(x,y,"DIAMOND", animation_key = "diamond", depth= constants.DEPTH_ITEM, item = item_com)
+    GAME.current_objects.append(return_object)
 #GAME FUNCTIONS
 def game_main_loop():
     '''Function loops through game logic'''
@@ -1461,10 +1599,15 @@ def game_main_loop():
         map_calc_fov()
         if player_action == "QUIT":
             game_exit()
-        elif player_action != "no-action":
-            for obj in GAME.current_objects:
-                if obj.ai:
+        for obj in GAME.current_objects:
+            if obj.ai:
+                if player_action != "no-action":
                     obj.ai.take_turn()
+            if obj.exitportal:
+                obj.exitportal.update()
+    
+        if PLAYER.state == "DEAD" or PLAYER.state == "STATUS_WIN":
+            game_quit = True
         draw_game()
         pygame.display.flip()
         CLOCK.tick(constants.GAME_FPS)
@@ -1472,22 +1615,25 @@ def game_main_loop():
 def game_init():
     '''Function inits the game window and pygame'''
 
-    global SURFACE_MAIN, SURFACE_MAP, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA, RANDOM_ENGINE
+    global SURFACE_MAIN, SURFACE_MAP, FOV_CALC, CLOCK, PLAYER, ENEMY, ASSETS, CAMERA, RANDOM_ENGINE, PREFS
 
     #init pygame
     pygame.init()
     pygame.key.set_repeat(200,70)
     libtcodpy.namegen_parse('assets\\namegen\\mingos_demon.cfg')
+    try:
+        prefs_load()
+    except:
+        PREFS = struc_Prefs()
 
     SURFACE_MAIN = pygame.display.set_mode((constants.CAM_WIDTH, constants.CAM_HEIGHT))
     SURFACE_MAP = pygame.Surface((constants.MAP_WIDTH * constants.CELL_WIDTH, constants.MAP_HEIGHT * constants.CELL_HEIGHT))
     CAMERA = obj_Camera()
-    ASSETS = struc_Assets()
+    ASSETS = obj_Assets()
     RANDOM_ENGINE = random.SystemRandom()
     FOV_CALC = True
     
     CLOCK = pygame.time.Clock()
-
 
 def game_handle_keys():
     global FOV_CALC
@@ -1533,7 +1679,8 @@ def game_handle_keys():
                 for obj in list_of_objs:
                     if obj.stairs:
                         obj.stairs.use()
-            
+                    if obj.exitportal:
+                        obj.exitportal.use()
     return "no-action"
 
 def game_message(game_msg, msg_color):
@@ -1568,6 +1715,16 @@ def game_load():
     for obj in GAME.current_objects:
         obj.animation_init()
     map_make_fov(GAME.current_map)
+
+def prefs_save():
+    with gzip.open('data\savedata\prefs', 'wb') as file:
+        pickle.dump(PREFS,file)
+
+def prefs_load():
+    global PREFS
+    with gzip.open('data\savedata\prefs', 'rb') as file:
+        PREFS = pickle.load(file)
+
 
 if __name__ == '__main__':
     menu_main()        

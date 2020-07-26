@@ -1,0 +1,19 @@
+Mingo attacks Abedulexa for 3 damage!
+Abedulexa the healing sprite's health is 0/1
+Abedulexa is dead! Gather his essence to heal!
+shield Picked Up
+healing sprite Picked Up
+Rangamon attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 7/10
+Mingo attacks Rangamon for 2 damage!
+Rangamon the skeleton mage's health is 8/10
+Rangamon attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 4/10
+Mingo attacks Rangamon for 2 damage!
+Rangamon the skeleton mage's health is 6/10
+Rangamon attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 1/10
+Mingo attacks Rangamon for 2 damage!
+Rangamon the skeleton mage's health is 4/10
+Rangamon attacks Mingo for 3 damage!
+Mingo the Maravinchi's health is 0/10
