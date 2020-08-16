@@ -3,13 +3,13 @@ from lib import draw, game, globalvars, maps, generator, constants, menu
 import _pickle as pickle
 import gzip
 import pygame
+
 class obj_Game:
     def __init__(self):
         self.current_objects = []
         self.message_history = []
         self.maps_prev = []
         self.maps_next = []
-        self.current_map, self.current_rooms = maps.map_create()
     def transition_next(self):
         global FOV_CALC
 
@@ -133,6 +133,8 @@ def game_new():
     globalvars.GAME = obj_Game()
 
     generator.gen_player((0,0))
+
+    globalvars.GAME.current_map, globalvars.GAME.current_rooms = maps.map_create()
 
     maps.map_place_objects(globalvars.GAME.current_rooms)
 

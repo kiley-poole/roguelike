@@ -4,7 +4,7 @@ import string
 import pygame
 import tcod as libtcodpy
 
-from lib import assets, camera, constants, data, globalvars
+from lib import assets, camera, constants, data, globalvars, game
 
 
 def game_init():

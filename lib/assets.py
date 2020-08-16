@@ -168,7 +168,8 @@ class obj_Assets:
         }
         
         self.wall_ex_dict = {
-            1 : self.S_WALL00_EX,
+            0 : self.S_WALL00_EX,
+            1 : self.S_WALL01_EX,
             2 : self.S_WALL02_EX,
             3 : self.S_WALL03_EX,
             4 : self.S_WALL04_EX,
